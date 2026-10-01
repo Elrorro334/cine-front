@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - develop
-      - Sprint1
-      - main
+      - 'Sprint*'
   pull_request:
     types: [opened, synchronize, reopened]
 
