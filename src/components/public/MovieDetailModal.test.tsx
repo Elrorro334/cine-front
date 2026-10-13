@@ -1,0 +1,84 @@
+import { render, screen, fireEvent } from '@testing-library/react';
+import MovieDetailModal from './MovieDetailModal';
+import { Movie } from '@/types/cartelera';
+
+const mockMovie: Movie = {
+  id: 1,
+  title: 'Resident Evil: Noche cero',
+  tagline: 'Sobrevive a la noche',
+  classification: 'B15',
+  duration: '93 min',
+  genre: 'Terror',
+  allGenres: 'Terror, Acción',
+  rating: '8.5',
+  posterUrl: 'https://image.tmdb.org/t/p/w500/test.jpg',
+  backdropUrl: 'https://image.tmdb.org/t/p/original/test-bg.jpg',
+  synopsis: 'Un mensajero en un hospital...',
+  releaseYear: '2026',
+  director: 'Director de prueba',
+  actors: 'Actor 1, Actor 2',
+  showtimes: ['11:30', '15:00'],
+};
+
+describe('MovieDetailModal Component', () => {
+  const mockOnClose = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('no se renderiza si isOpen es false o movie es null', () => {
+    const { container: c1 } = render(
+      <MovieDetailModal isOpen={false} movie={mockMovie} onClose={mockOnClose} />
+    );
+    expect(c1.firstChild).toBeNull();
+
+    const { container: c2 } = render(
+      <MovieDetailModal isOpen={true} movie={null} onClose={mockOnClose} />
+    );
+    expect(c2.firstChild).toBeNull();
+  });
+
+  test('renderiza toda la información técnica, sinopsis y horarios', () => {
+    render(<MovieDetailModal isOpen={true} movie={mockMovie} onClose={mockOnClose} />);
+
+    expect(screen.getByText('Resident Evil: Noche cero')).toBeInTheDocument();
+    expect(screen.getByText(/Sobrevive a la noche/i)).toBeInTheDocument();
+    expect(screen.getByText('Clasif. B15')).toBeInTheDocument();
+    expect(screen.getByText('Terror, Acción')).toBeInTheDocument();
+    expect(screen.getByText(/• 2026/i)).toBeInTheDocument();
+    expect(screen.getByText('Un mensajero en un hospital...')).toBeInTheDocument();
+    expect(screen.getByText('Director de prueba')).toBeInTheDocument();
+    expect(screen.getByText('Actor 1, Actor 2')).toBeInTheDocument();
+    expect(screen.getByText('11:30')).toBeInTheDocument();
+    expect(screen.getByText('15:00')).toBeInTheDocument();
+  });
+
+  test('permite seleccionar un horario y muestra la confirmación', () => {
+    render(<MovieDetailModal isOpen={true} movie={mockMovie} onClose={mockOnClose} />);
+
+    const horarioBtn = screen.getByRole('button', { name: /11:30 Disponible/i });
+    fireEvent.click(horarioBtn);
+
+    expect(screen.getByText(/Horario elegido: 11:30 hrs/i)).toBeInTheDocument();
+  });
+
+  test('llama a onClose al presionar el botón de cerrar y la tecla Escape', () => {
+    render(<MovieDetailModal isOpen={true} movie={mockMovie} onClose={mockOnClose} />);
+
+    const closeBtn = screen.getByRole('button', { name: /Cerrar ficha técnica/i });
+    fireEvent.click(closeBtn);
+    expect(mockOnClose).toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(mockOnClose).toHaveBeenCalledTimes(2);
+  });
+
+  test('llama a onClose al hacer clic en el backdrop', () => {
+    render(<MovieDetailModal isOpen={true} movie={mockMovie} onClose={mockOnClose} />);
+
+    const backdropBtn = screen.getByRole('button', { name: /Cerrar modal/i });
+    fireEvent.click(backdropBtn);
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+});
