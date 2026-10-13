@@ -20,7 +20,8 @@ describe('QrScannerModal Component', () => {
     const input = screen.getByPlaceholderText(/Escribir o escanear folio/i);
     fireEvent.change(input, { target: { value: 'PRE-XIL-12345' } });
 
-    const btn = screen.getByRole('button', { name: /Validar y Cargar en Caja/i });
+    // Se actualizó el texto que busca Testing Library para coincidir con el componente
+    const btn = screen.getByRole('button', { name: /Validar e Ingresar/i });
     fireEvent.click(btn);
 
     expect(mockOnScanSuccess).toHaveBeenCalledWith('PRE-XIL-12345');

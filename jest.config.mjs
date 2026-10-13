@@ -16,6 +16,8 @@ const config = {
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',
     '!src/types/**',
+    '!src/app/layout.tsx',
+    '!src/app/(public)/**',
   ],
   coverageReporters: ['text', 'lcov', 'clover'],
 };

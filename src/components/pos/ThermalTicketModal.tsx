@@ -1,13 +1,13 @@
 'use client';
 
-interface ThermalTicketModalProps {
+type ThermalTicketModalProps = Readonly<{
   isOpen: boolean;
   folio: string;
   items: Array<{ nombre: string; cantidad: number; precio: number }>;
   total: number;
   metodoPago: string;
   onNewSale: () => void;
-}
+}>;
 
 export default function ThermalTicketModal({
   isOpen,
@@ -24,14 +24,13 @@ export default function ThermalTicketModal({
       <div className="max-w-md w-full bg-white text-black p-6 rounded-xl text-left shadow-2xl font-mono text-xs space-y-3">
         <div className="text-center border-b border-dashed border-black pb-3">
           <h2 className="text-base font-black uppercase">CINE TEATRO XILOTZIN</h2>
-          <p className="text-[9px]">Jilotepec, Estado de México</p>
           <p className="text-[10px] font-bold uppercase mt-1">TICKET DE VENTA OFICIAL</p>
           <p className="text-[9px]">FOLIO: {folio}</p>
         </div>
 
         <div className="space-y-1">
-          {items.map((i, index) => (
-            <div key={index} className="flex justify-between">
+          {items.map((i) => (
+            <div key={`${i.nombre}-${i.precio}`} className="flex justify-between">
               <span>
                 {i.cantidad}x {i.nombre.substring(0, 22)}
               </span>
@@ -52,14 +51,16 @@ export default function ThermalTicketModal({
 
         <div className="pt-4 flex gap-2">
           <button
+            type="button"
             onClick={() => window.print()}
-            className="flex-1 bg-black text-white font-bold py-2.5 rounded-lg uppercase tracking-wider text-[10px] flex justify-center items-center gap-1.5"
+            className="flex-1 bg-black text-white font-bold py-2.5 rounded-lg uppercase text-[10px]"
           >
-            <i className="fa-solid fa-print" /> Imprimir
+            Imprimir
           </button>
           <button
+            type="button"
             onClick={onNewSale}
-            className="flex-1 bg-[#D81B60] text-white font-bold py-2.5 rounded-lg uppercase tracking-wider text-[10px]"
+            className="flex-1 bg-[#D81B60] text-white font-bold py-2.5 rounded-lg uppercase text-[10px]"
           >
             Nueva Venta
           </button>
