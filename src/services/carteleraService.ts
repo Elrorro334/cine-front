@@ -5,7 +5,19 @@ const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_ORIGINAL = 'https://image.tmdb.org/t/p/original';
 
-// Catálogo base de películas en exhibición para Cine Teatro Xilotzin
+// Horarios escalonados para las funciones del Cine Teatro Xilotzin
+const showtimeSlots: ReadonlyArray<ReadonlyArray<string>> = [
+  ['11:30', '15:00', '19:15', '22:00'],
+  ['12:15', '16:00', '20:30'],
+  ['13:00', '16:45', '21:15'],
+  ['10:45', '14:30', '18:00', '21:45'],
+  ['12:45', '17:15', '20:45'],
+  ['11:00', '15:30', '19:00', '22:15'],
+  ['13:30', '17:45', '21:00'],
+  ['14:00', '18:30', '21:30'],
+];
+
+// Catálogo base de respaldo en caso de falta de conexión
 const localCatalog: ReadonlyArray<{ id: number; title: string; showtimes: string[]; fallbackClassification: string }> = [
   { id: 1, title: 'Caminos del Crimen', showtimes: ['10:30', '15:00', '19:30'], fallbackClassification: 'B15' },
   { id: 2, title: 'Payaso terrifier', showtimes: ['12:30', '17:15', '22:00'], fallbackClassification: 'C' },
@@ -89,6 +101,7 @@ interface TmdbVideoItem {
 }
 
 interface TmdbMovieDetailsResponse {
+  id: number;
   title?: string;
   tagline?: string;
   overview?: string;
@@ -110,12 +123,18 @@ interface TmdbMovieDetailsResponse {
   };
 }
 
-interface TmdbSearchResultItem {
+interface TmdbNowPlayingItem {
   id: number;
+  title: string;
+  overview?: string;
+  poster_path?: string;
+  backdrop_path?: string;
+  vote_average?: number;
+  release_date?: string;
 }
 
-interface TmdbSearchResponse {
-  results?: TmdbSearchResultItem[];
+interface TmdbNowPlayingResponse {
+  results?: TmdbNowPlayingItem[];
 }
 
 const certificationMap: Record<string, string> = {
@@ -126,15 +145,54 @@ const certificationMap: Record<string, string> = {
   'NC-17': 'C',
 };
 
-function resolveClassification(certRaw: string, fallback: string): string {
+function resolveClassification(certRaw: string, fallback = 'B'): string {
   if (!certRaw) return fallback;
   return certificationMap[certRaw] ?? certRaw;
 }
 
-async function fetchTmdbMovie(
-  item: { id: number; title: string; showtimes: string[]; fallbackClassification: string }
-): Promise<Movie> {
-  const defaultMovie: Movie = {
+async function fetchMovieDetails(movieId: number, fallbackSlotIndex: number): Promise<Movie> {
+  const fallbackSlot = [...showtimeSlots[fallbackSlotIndex % showtimeSlots.length]];
+  const detailUrl = `${TMDB_BASE}/movie/${movieId}?api_key=${TMDB_API_KEY}&language=es-MX&append_to_response=release_dates,credits,videos`;
+  const detailRes = await fetch(detailUrl);
+
+  if (!detailRes.ok) {
+    throw new Error(`Failed to fetch movie details for ${movieId}`);
+  }
+
+  const d = (await detailRes.json()) as TmdbMovieDetailsResponse;
+
+  const mxRelease = d.release_dates?.results?.find((r) => r.iso_3166_1 === 'MX');
+  const usRelease = d.release_dates?.results?.find((r) => r.iso_3166_1 === 'US');
+  const certRaw = mxRelease?.release_dates?.[0]?.certification ?? usRelease?.release_dates?.[0]?.certification ?? '';
+
+  const director = d.credits?.crew?.find((c) => c.job === 'Director')?.name || 'Director Cinematográfico';
+  const actors = d.credits?.cast?.slice(0, 3).map((a) => a.name).join(', ') || 'Elenco estelar';
+  const mainGenre = d.genres?.[0]?.name || 'Cine';
+  const allGenres = d.genres?.map((g) => g.name).join(', ') || 'Cine';
+  const trailer = d.videos?.results?.find((v) => v.site === 'YouTube' && v.type === 'Trailer')?.key || null;
+
+  return {
+    id: d.id,
+    title: d.title || 'Película en Cartelera',
+    tagline: d.tagline || 'Gran Estreno en Pantalla Gigante',
+    classification: resolveClassification(certRaw, 'B'),
+    duration: d.runtime ? `${d.runtime} min` : '115 min',
+    genre: mainGenre,
+    allGenres: allGenres,
+    rating: d.vote_average ? d.vote_average.toFixed(1) : '8.5',
+    posterUrl: d.poster_path ? `${TMDB_IMG}${d.poster_path}` : 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=600',
+    backdropUrl: d.backdrop_path ? `${TMDB_IMG_ORIGINAL}${d.backdrop_path}` : '',
+    synopsis: d.overview || 'Disfruta de esta emocionante producción en nuestra pantalla gigante con audio cinematográfico inmersivo.',
+    releaseYear: d.release_date ? d.release_date.split('-')[0] : '2026',
+    director: director,
+    actors: actors,
+    trailerKey: trailer,
+    showtimes: fallbackSlot,
+  };
+}
+
+function getFallbackCatalog(): Movie[] {
+  return localCatalog.map((item) => ({
     id: item.id,
     title: item.title,
     tagline: 'Gran Función en Pantalla Gigante',
@@ -148,59 +206,10 @@ async function fetchTmdbMovie(
     synopsis: 'Vive la magia del cine tradicional en el corazón de Jilotepec. Sonido digital envolvente y la mejor dulcería.',
     releaseYear: '2026',
     director: 'Director Cinematográfico',
-    actors: 'Reparto estelar',
+    actors: 'Reparto oficial',
     trailerKey: null,
     showtimes: item.showtimes,
-  };
-
-  try {
-    const searchUrl = `${TMDB_BASE}/search/movie?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(
-      item.title
-    )}`;
-    const searchRes = await fetch(searchUrl);
-    if (!searchRes.ok) return defaultMovie;
-
-    const searchData = (await searchRes.json()) as TmdbSearchResponse;
-    const firstResult = searchData.results?.[0];
-    if (!firstResult) return defaultMovie;
-
-    const detailUrl = `${TMDB_BASE}/movie/${firstResult.id}?api_key=${TMDB_API_KEY}&language=es-MX&append_to_response=release_dates,credits,videos`;
-    const detailRes = await fetch(detailUrl);
-    if (!detailRes.ok) return defaultMovie;
-
-    const d = (await detailRes.json()) as TmdbMovieDetailsResponse;
-
-    const mxRelease = d.release_dates?.results?.find((r) => r.iso_3166_1 === 'MX');
-    const usRelease = d.release_dates?.results?.find((r) => r.iso_3166_1 === 'US');
-    const certRaw = mxRelease?.release_dates?.[0]?.certification ?? usRelease?.release_dates?.[0]?.certification ?? '';
-
-    const director = d.credits?.crew?.find((c) => c.job === 'Director')?.name || 'Director Cinematográfico';
-    const actors = d.credits?.cast?.slice(0, 3).map((a) => a.name).join(', ') || 'Reparto estelar';
-    const mainGenre = d.genres?.[0]?.name || 'Cine';
-    const allGenres = d.genres?.map((g) => g.name).join(', ') || 'Cine';
-    const trailer = d.videos?.results?.find((v) => v.site === 'YouTube' && v.type === 'Trailer')?.key || null;
-
-    return {
-      id: item.id,
-      title: d.title || item.title,
-      tagline: d.tagline || defaultMovie.tagline,
-      classification: resolveClassification(certRaw, item.fallbackClassification),
-      duration: d.runtime ? `${d.runtime} min` : defaultMovie.duration,
-      genre: mainGenre,
-      allGenres: allGenres,
-      rating: d.vote_average ? d.vote_average.toFixed(1) : defaultMovie.rating,
-      posterUrl: d.poster_path ? `${TMDB_IMG}${d.poster_path}` : defaultMovie.posterUrl,
-      backdropUrl: d.backdrop_path ? `${TMDB_IMG_ORIGINAL}${d.backdrop_path}` : '',
-      synopsis: d.overview || defaultMovie.synopsis,
-      releaseYear: d.release_date ? d.release_date.split('-')[0] : '2026',
-      director: director,
-      actors: actors,
-      trailerKey: trailer,
-      showtimes: item.showtimes,
-    };
-  } catch {
-    return defaultMovie;
-  }
+  }));
 }
 
 export const carteleraService = {
@@ -208,8 +217,36 @@ export const carteleraService = {
     return initialPromotions;
   },
 
+  /**
+   * Obtiene la cartelera actual directamente desde la API oficial de películas en cines de México (now_playing).
+   * Si la API no responde, utiliza de respaldo el catálogo local garantizado.
+   */
   async getCarteleraHoy(): Promise<Movie[]> {
-    const promises = localCatalog.map((item) => fetchTmdbMovie(item));
-    return Promise.all(promises);
+    try {
+      const nowPlayingUrl = `${TMDB_BASE}/movie/now_playing?api_key=${TMDB_API_KEY}&language=es-MX&region=MX&page=1`;
+      const res = await fetch(nowPlayingUrl);
+
+      if (res.ok) {
+        const data = (await res.json()) as TmdbNowPlayingResponse;
+        const currentMovies = data.results?.slice(0, 8) ?? [];
+
+        if (currentMovies.length > 0) {
+          const detailedPromises = currentMovies.map((movie, index) =>
+            fetchMovieDetails(movie.id, index).catch(() => null)
+          );
+
+          const results = await Promise.all(detailedPromises);
+          const validMovies = results.filter((m): m is Movie => m !== null);
+
+          if (validMovies.length > 0) {
+            return validMovies;
+          }
+        }
+      }
+
+      return getFallbackCatalog();
+    } catch {
+      return getFallbackCatalog();
+    }
   },
 };

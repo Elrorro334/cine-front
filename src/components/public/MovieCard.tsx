@@ -29,18 +29,11 @@ export default function MovieCard({ movie, onSelect }: MovieCardProps) {
 
   return (
     <article className="group bg-[#111111] border border-[#262626] rounded-2xl overflow-hidden flex flex-col hover:border-[#D81B60]/70 hover:shadow-xl hover:shadow-[#D81B60]/10 transition-all duration-300">
-      {/* Poster Clickable Area */}
-      <div
-        role="button"
-        tabIndex={0}
+      {/* Poster Clickable Button */}
+      <button
+        type="button"
         onClick={() => onSelect(movie)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onSelect(movie);
-          }
-        }}
-        className="relative aspect-[2/3] w-full overflow-hidden cursor-pointer bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#D81B60]"
+        className="relative aspect-[2/3] w-full overflow-hidden cursor-pointer bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#D81B60] block p-0 border-none text-left"
         aria-label={`Ver ficha técnica de ${movie.title}`}
       >
         {/* Poster Image */}
@@ -72,10 +65,10 @@ export default function MovieCard({ movie, onSelect }: MovieCardProps) {
         {/* Floating Quick Action Overlay */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/50 backdrop-blur-[2px]">
           <span className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#D81B60] to-[#F57C00] text-white text-xs font-black uppercase tracking-wider shadow-lg transform -translate-y-2 group-hover:translate-y-0 transition-transform">
-            Ver Ficha Técnica
+            Conocer más
           </span>
         </div>
-      </div>
+      </button>
 
       {/* Card Body */}
       <div className="p-4 flex flex-col flex-grow justify-between space-y-3">
@@ -85,11 +78,14 @@ export default function MovieCard({ movie, onSelect }: MovieCardProps) {
             <span className="font-mono text-neutral-400 shrink-0">{movie.duration}</span>
           </div>
 
-          <h3
-            onClick={() => onSelect(movie)}
-            className="font-['Playfair_Display',serif] text-base sm:text-lg font-black text-white hover:text-[#D81B60] transition-colors cursor-pointer line-clamp-1"
-          >
-            {movie.title}
+          <h3 className="font-['Playfair_Display',serif] text-base sm:text-lg font-black text-white line-clamp-1">
+            <button
+              type="button"
+              onClick={() => onSelect(movie)}
+              className="hover:text-[#D81B60] transition-colors text-left"
+            >
+              {movie.title}
+            </button>
           </h3>
         </div>
 
@@ -118,7 +114,7 @@ export default function MovieCard({ movie, onSelect }: MovieCardProps) {
           onClick={() => onSelect(movie)}
           className="w-full mt-2 py-2 px-3 rounded-xl border border-[#262626] bg-[#1a1a1a] hover:bg-[#D81B60] hover:border-[#D81B60] text-white text-xs font-bold uppercase tracking-wider transition-all"
         >
-          Detalles y Horarios
+          Conocer más
         </button>
       </div>
     </article>

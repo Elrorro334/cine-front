@@ -20,7 +20,8 @@ export default function PromotionsBanner({ promotions }: PromotionsBannerProps) 
 
   if (!promotions || promotions.length === 0) return null;
 
-  const currentPromo = promotions[activeIndex];
+  const currentPromo = promotions[activeIndex] ?? promotions[0];
+  if (!currentPromo) return null;
 
   return (
     <section id="promociones" className="w-full relative overflow-hidden rounded-3xl border border-[#262626] bg-[#111111] shadow-2xl">

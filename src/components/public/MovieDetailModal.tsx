@@ -43,10 +43,11 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
       className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md transition-opacity duration-300"
     >
       {/* Backdrop click to close */}
-      <div
-        className="fixed inset-0"
+      <button
+        type="button"
+        aria-label="Cerrar modal"
         onClick={onClose}
-        aria-hidden="true"
+        className="fixed inset-0 bg-transparent cursor-default w-full h-full border-none p-0 -z-10 focus:outline-none"
       />
 
       {/* Modal Dialog Card */}
@@ -79,7 +80,7 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
           {/* Badge Over Backing */}
           <div className="absolute bottom-4 left-6 right-6 flex items-end justify-between gap-3">
             <span className="px-3 py-1 rounded-lg bg-[#D81B60] text-white text-[11px] font-mono font-black uppercase tracking-wider shadow-lg">
-              Ficha Técnica
+              Detalles y Horarios
             </span>
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-lg bg-black/80 border border-amber-500/40 text-amber-400 text-xs font-mono font-bold">
@@ -226,7 +227,7 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
             onClick={onClose}
             className="px-5 py-2.5 rounded-xl bg-[#1f1f1f] hover:bg-neutral-700 text-white text-xs font-bold uppercase transition-all"
           >
-            Cerrar Ficha
+            Cerrar
           </button>
         </div>
       </div>
