@@ -60,7 +60,7 @@ export default function PublicPage() {
       const matchesSearch =
         searchQuery.trim() === '' ||
         movie.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (movie.genre && movie.genre.toLowerCase().includes(searchQuery.toLowerCase()));
+        movie.genre?.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesClassification =
         selectedClassification === 'Todas' ||
@@ -69,6 +69,61 @@ export default function PublicPage() {
       return matchesSearch && matchesClassification;
     });
   }, [movies, searchQuery, selectedClassification]);
+
+  const renderCarteleraGrid = () => {
+    if (loading) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 pb-10">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+            <div
+              key={n}
+              className="bg-[#121212] border border-[#262626] rounded-2xl p-4 space-y-4 animate-pulse flex flex-col"
+            >
+              <div className="w-full aspect-[2/3] bg-neutral-900 rounded-xl" />
+              <div className="h-4 bg-neutral-800 rounded w-3/4" />
+              <div className="h-3 bg-neutral-800 rounded w-1/2" />
+              <div className="h-8 bg-neutral-800 rounded w-full mt-auto" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (filteredMovies.length === 0) {
+      return (
+        <div className="py-16 text-center space-y-3 bg-[#121212] border border-[#262626] rounded-3xl p-8 max-w-lg mx-auto">
+          <p className="text-base font-bold text-white uppercase">
+            No se encontraron películas
+          </p>
+          <p className="text-xs text-[#A0A0A0]">
+            No hay títulos en cartelera que coincidan con &ldquo;{searchQuery}&rdquo;.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery('');
+              setSelectedClassification('Todas');
+            }}
+            className="mt-2 px-4 py-2 rounded-xl bg-[#262626] text-xs font-bold text-white hover:bg-[#E11D2F] transition-colors"
+          >
+            Restablecer Filtros
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 pb-10">
+        {filteredMovies.map((movie) => (
+          <MovieCard
+            key={movie.id}
+            movie={movie}
+            onSelect={handleOpenDetail}
+          />
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-['Montserrat',sans-serif] flex flex-col antialiased selection:bg-[#E11D2F] selection:text-white relative">
@@ -170,50 +225,8 @@ export default function PublicPage() {
         </div>
 
         {/* Grilla de Películas (Tarjetas limpias con relación de aspecto 2/3 y 4 columnas en desktop) */}
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 pb-10">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-              <div
-                key={n}
-                className="bg-[#121212] border border-[#262626] rounded-2xl p-4 space-y-4 animate-pulse flex flex-col"
-              >
-                <div className="w-full aspect-[2/3] bg-neutral-900 rounded-xl" />
-                <div className="h-4 bg-neutral-800 rounded w-3/4" />
-                <div className="h-3 bg-neutral-800 rounded w-1/2" />
-                <div className="h-8 bg-neutral-800 rounded w-full mt-auto" />
-              </div>
-            ))}
-          </div>
-        ) : filteredMovies.length === 0 ? (
-          <div className="py-16 text-center space-y-3 bg-[#121212] border border-[#262626] rounded-3xl p-8 max-w-lg mx-auto">
-            <p className="text-base font-bold text-white uppercase">
-              No se encontraron películas
-            </p>
-            <p className="text-xs text-[#A0A0A0]">
-              No hay títulos en cartelera que coincidan con &ldquo;{searchQuery}&rdquo;.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedClassification('Todas');
-              }}
-              className="mt-2 px-4 py-2 rounded-xl bg-[#262626] text-xs font-bold text-white hover:bg-[#E11D2F] transition-colors"
-            >
-              Restablecer Filtros
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 pb-10">
-            {filteredMovies.map((movie) => (
-              <MovieCard
-                key={movie.id}
-                movie={movie}
-                onSelect={handleOpenDetail}
-              />
-            ))}
-          </div>
-        )}
+        {renderCarteleraGrid()}
+
 
         {/* Sección Informativa Institucional (Tradición Jilotepec) */}
         <section className="p-6 sm:p-8 rounded-3xl bg-[#121212] border border-[#262626] grid grid-cols-1 md:grid-cols-3 gap-6 text-center md:text-left">

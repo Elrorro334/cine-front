@@ -80,7 +80,7 @@ export default function DashboardPage() {
   }, []);
 
   // 3. Buscar en TMDB
-  const handleSearchTmdb = async (e?: React.FormEvent) => {
+  const handleSearchTmdb = async (e?: React.SyntheticEvent) => {
     if (e) e.preventDefault();
     if (!tmdbQuery.trim()) return;
 
@@ -138,7 +138,7 @@ export default function DashboardPage() {
   };
 
   // 5. Registrar película en SQL Server
-  const handleRegisterMovie = async (e: React.FormEvent) => {
+  const handleRegisterMovie = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!regTitulo.trim()) {
       showToast('El título de la película es obligatorio.', 'error');
@@ -211,9 +211,11 @@ export default function DashboardPage() {
 
       {/* Backdrop para Drawer Móvil */}
       {isSidebarOpen && (
-        <div
+        <button
+          type="button"
+          aria-label="Cerrar navegación lateral"
           onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 bg-black/75 z-40 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 bg-black/75 z-40 backdrop-blur-sm lg:hidden border-none p-0 w-full h-full cursor-default"
         />
       )}
 
@@ -346,8 +348,16 @@ export default function DashboardPage() {
 
                       return (
                         <div
+                          role="button"
+                          tabIndex={0}
                           key={movie.tmdbId}
                           onClick={() => handleSelectTmdbMovie(movie)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              void handleSelectTmdbMovie(movie);
+                            }
+                          }}
                           className={`p-3 rounded-xl border cursor-pointer transition-all flex gap-3 ${
                             isSelected
                               ? 'bg-[#D81B60]/20 border-[#D81B60] shadow-md'
@@ -432,10 +442,11 @@ export default function DashboardPage() {
                     <div className="md:col-span-2 space-y-4 text-xs font-sans">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
+                          <label htmlFor="dashboard-reg-titulo" className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
                             Título Oficial
                           </label>
                           <input
+                            id="dashboard-reg-titulo"
                             type="text"
                             value={regTitulo}
                             onChange={(e) => setRegTitulo(e.target.value)}
@@ -445,10 +456,11 @@ export default function DashboardPage() {
                         </div>
 
                         <div>
-                          <label className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
+                          <label htmlFor="dashboard-reg-director" className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
                             Director
                           </label>
                           <input
+                            id="dashboard-reg-director"
                             type="text"
                             value={regDirector}
                             onChange={(e) => setRegDirector(e.target.value)}
@@ -459,10 +471,11 @@ export default function DashboardPage() {
                       </div>
 
                       <div>
-                        <label className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
+                        <label htmlFor="dashboard-reg-sinopsis" className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
                           Sinopsis
                         </label>
                         <textarea
+                          id="dashboard-reg-sinopsis"
                           value={regSinopsis}
                           onChange={(e) => setRegSinopsis(e.target.value)}
                           rows={3}
@@ -472,10 +485,11 @@ export default function DashboardPage() {
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <div>
-                          <label className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
+                          <label htmlFor="dashboard-reg-duracion" className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
                             Duración (min)
                           </label>
                           <input
+                            id="dashboard-reg-duracion"
                             type="number"
                             value={regDuracion}
                             onChange={(e) => setRegDuracion(Number(e.target.value))}
@@ -486,10 +500,11 @@ export default function DashboardPage() {
                         </div>
 
                         <div>
-                          <label className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
+                          <label htmlFor="dashboard-reg-clasif" className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
                             Clasificación
                           </label>
                           <select
+                            id="dashboard-reg-clasif"
                             value={regClasif}
                             onChange={(e) => setRegClasif(e.target.value)}
                             className="w-full bg-[#050505] text-white p-3 rounded-xl border border-[#262626] font-bold"
@@ -503,10 +518,11 @@ export default function DashboardPage() {
                         </div>
 
                         <div>
-                          <label className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
+                          <label htmlFor="dashboard-reg-sala" className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
                             Asignar Sala
                           </label>
                           <select
+                            id="dashboard-reg-sala"
                             value={regSala}
                             onChange={(e) => setRegSala(Number(e.target.value))}
                             className="w-full bg-[#050505] text-white p-3 rounded-xl border border-[#262626] font-bold"
@@ -517,10 +533,11 @@ export default function DashboardPage() {
                         </div>
 
                         <div>
-                          <label className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
+                          <label htmlFor="dashboard-reg-precio" className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-1">
                             Precio Boleto ($)
                           </label>
                           <input
+                            id="dashboard-reg-precio"
                             type="number"
                             value={regPrecio}
                             onChange={(e) => setRegPrecio(Number(e.target.value))}
@@ -533,9 +550,9 @@ export default function DashboardPage() {
 
                       {/* Horario de Exhibición */}
                       <div className="pt-2">
-                        <label className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-2">
+                        <span className="block text-[#a3a3a3] uppercase font-bold tracking-wider mb-2">
                           Horario de Función (Hoy)
-                        </label>
+                        </span>
                         <div className="flex flex-wrap gap-2">
                           {['11:00', '13:30', '16:00', '18:30', '21:00', '22:15'].map((time) => (
                             <button
@@ -553,6 +570,7 @@ export default function DashboardPage() {
                           ))}
                           <input
                             type="time"
+                            aria-label="Horario personalizado"
                             value={regHorario}
                             onChange={(e) => setRegHorario(e.target.value)}
                             className="bg-[#050505] text-white px-3 py-1.5 rounded-xl border border-[#262626] font-mono text-xs"
@@ -625,9 +643,9 @@ export default function DashboardPage() {
                         Dir: {movie.director}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1">
-                        {movie.showtimes.slice(0, 3).map((h, idx) => (
+                        {movie.showtimes.slice(0, 3).map((h) => (
                           <span
-                            key={idx}
+                            key={`${movie.id}-${h}`}
                             className="bg-[#111111] border border-[#262626] text-[9px] font-mono text-white px-1.5 py-0.5 rounded"
                           >
                             {h}

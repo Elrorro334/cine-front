@@ -35,11 +35,11 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
   if (!isOpen || !movie) return null;
 
   return (
-    <div
-      role="dialog"
+    <dialog
+      open
       aria-modal="true"
       aria-labelledby="movie-modal-title"
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#0A0A0A]/95 backdrop-blur-md transition-opacity duration-300"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#0A0A0A]/95 backdrop-blur-md transition-opacity duration-300 border-none m-0 max-w-none max-h-none w-full h-full"
     >
       {/* Backdrop click to close */}
       <button
@@ -170,6 +170,6 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

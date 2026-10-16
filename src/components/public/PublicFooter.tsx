@@ -31,7 +31,7 @@ export default function PublicFooter() {
           {/* Columna 2: Navegación Rápida */}
           <div>
             <h3 className="text-white font-sans font-bold uppercase tracking-widest text-xs mb-6 flex items-center gap-2">
-              <svg className="w-4 h-4 text-[#E11D2F]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg aria-hidden="true" className="w-4 h-4 text-[#E11D2F]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
               Navegación Rápida
@@ -54,7 +54,7 @@ export default function PublicFooter() {
               </li>
               <li>
                 <Link href="/login" className="hover:text-white transition-colors flex items-center gap-2">
-                  <span className="text-[#E11D2F]">›</span> Acceso Sistema POS
+                  <span>›</span> Acceso Sistema POS
                 </Link>
               </li>
             </ul>
@@ -63,7 +63,7 @@ export default function PublicFooter() {
           {/* Columna 3: Ubicación */}
           <div>
             <h3 className="text-white font-sans font-bold uppercase tracking-widest text-xs mb-6 flex items-center gap-2">
-              <svg className="w-4 h-4 text-[#E11D2F]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg aria-hidden="true" className="w-4 h-4 text-[#E11D2F]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
@@ -90,21 +90,27 @@ export default function PublicFooter() {
             </h3>
             <div className="flex gap-3 mb-6">
               <a
-                href="#"
+                href="https://facebook.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-[#050505] border border-[#262626] flex items-center justify-center text-[#a3a3a3] hover:text-white hover:border-[#E11D2F] transition-all shadow-lg text-xs font-bold"
                 aria-label="Facebook"
               >
                 FB
               </a>
               <a
-                href="#"
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-[#050505] border border-[#262626] flex items-center justify-center text-[#a3a3a3] hover:text-white hover:border-[#E11D2F] transition-all shadow-lg text-xs font-bold"
                 aria-label="Instagram"
               >
                 IG
               </a>
               <a
-                href="#"
+                href="https://tiktok.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-[#050505] border border-[#262626] flex items-center justify-center text-[#a3a3a3] hover:text-white hover:border-[#E11D2F] transition-all shadow-lg text-xs font-bold"
                 aria-label="TikTok"
               >

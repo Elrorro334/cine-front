@@ -6,9 +6,9 @@ import { getPosterUrl } from '@/lib/tmdb';
 import { TmdbSearchResultDto, TmdbMovieDetailDto } from '@/types/api';
 
 interface TmdbRegisterModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onMovieRegistered: () => void;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onMovieRegistered: () => void;
 }
 
 export default function TmdbRegisterModal({
@@ -40,7 +40,7 @@ export default function TmdbRegisterModal({
   if (!isOpen) return null;
 
   // Paso 1: Búsqueda preliminar en TMDB
-  const handleSearch = async (e?: React.FormEvent) => {
+  const handleSearch = async (e?: React.SyntheticEvent) => {
     if (e) e.preventDefault();
     if (!query.trim()) return;
 
@@ -285,10 +285,11 @@ export default function TmdbRegisterModal({
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-[11px] text-neutral-400 block mb-1">Sala de Proyección</label>
+                    <label htmlFor="detail-id-sala" className="text-[11px] text-neutral-400 block mb-1">Sala de Proyección</label>
                     <select
+                      id="detail-id-sala"
                       value={detailIdSala}
-                      onChange={(e) => setDetailIdSala(parseInt(e.target.value, 10))}
+                      onChange={(e) => setDetailIdSala(Number.parseInt(e.target.value, 10))}
                       className="w-full bg-[#161616] border border-[#333] rounded-lg px-3 py-2 text-xs text-white"
                     >
                       <option value={1}>Sala 1 - Pantalla Principal MacroXE</option>
@@ -296,8 +297,9 @@ export default function TmdbRegisterModal({
                     </select>
                   </div>
                   <div>
-                    <label className="text-[11px] text-neutral-400 block mb-1">Horario de Inicio</label>
+                    <label htmlFor="detail-horario-input" className="text-[11px] text-neutral-400 block mb-1">Horario de Inicio</label>
                     <input
+                      id="detail-horario-input"
                       type="time"
                       value={detailHorario}
                       onChange={(e) => setDetailHorario(e.target.value)}
@@ -305,11 +307,12 @@ export default function TmdbRegisterModal({
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-neutral-400 block mb-1">Precio General ($ MXN)</label>
+                    <label htmlFor="detail-precio-input" className="text-[11px] text-neutral-400 block mb-1">Precio General ($ MXN)</label>
                     <input
+                      id="detail-precio-input"
                       type="number"
                       value={detailPrecio}
-                      onChange={(e) => setDetailPrecio(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setDetailPrecio(Number.parseFloat(e.target.value) || 0)}
                       className="w-full bg-[#161616] border border-[#333] rounded-lg px-3 py-2 text-xs text-white font-mono"
                     />
                   </div>
@@ -401,8 +404,9 @@ export default function TmdbRegisterModal({
                         <div className="mt-2 pt-2 border-t border-[#262626]/80 space-y-2">
                           <div className="grid grid-cols-3 gap-1.5 text-[10px]">
                             <div>
-                              <label className="text-[#737373] block mb-0.5">Horario</label>
+                              <label htmlFor={`horario-tmdb-${movie.tmdbId}`} className="text-[#737373] block mb-0.5">Horario</label>
                               <input
+                                id={`horario-tmdb-${movie.tmdbId}`}
                                 type="time"
                                 value={customHorarios[movie.tmdbId] || '18:00'}
                                 onChange={(e) =>
@@ -412,22 +416,24 @@ export default function TmdbRegisterModal({
                               />
                             </div>
                             <div>
-                              <label className="text-[#737373] block mb-0.5">Precio ($)</label>
+                              <label htmlFor={`precio-tmdb-${movie.tmdbId}`} className="text-[#737373] block mb-0.5">Precio ($)</label>
                               <input
+                                id={`precio-tmdb-${movie.tmdbId}`}
                                 type="number"
                                 value={customPrecios[movie.tmdbId] ?? 50}
                                 onChange={(e) =>
                                   setCustomPrecios((prev) => ({
                                     ...prev,
-                                    [movie.tmdbId]: parseFloat(e.target.value) || 0,
+                                    [movie.tmdbId]: Number.parseFloat(e.target.value) || 0,
                                   }))
                                 }
                                 className="w-full bg-[#0a0a0a] border border-[#333] rounded px-1.5 py-1 text-white font-mono"
                               />
                             </div>
                             <div>
-                              <label className="text-[#737373] block mb-0.5">Clasif.</label>
+                              <label htmlFor={`clasif-tmdb-${movie.tmdbId}`} className="text-[#737373] block mb-0.5">Clasif.</label>
                               <select
+                                id={`clasif-tmdb-${movie.tmdbId}`}
                                 value={customClasif[movie.tmdbId] || 'B'}
                                 onChange={(e) =>
                                   setCustomClasif((prev) => ({ ...prev, [movie.tmdbId]: e.target.value }))

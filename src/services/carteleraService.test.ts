@@ -34,7 +34,7 @@ describe('carteleraService', () => {
     });
 
     const movies = await carteleraService.getCarteleraHoy();
-    expect(movies.length).toBe(1);
+    expect(movies).toHaveLength(1);
     expect(movies[0].title).toBe('Película en Vivo');
     expect(movies[0].director).toBe('Director Famoso');
     expect(movies[0].classification).toBe('B');
@@ -63,7 +63,7 @@ describe('carteleraService', () => {
     });
 
     const movies = await carteleraService.getCarteleraHoy('Spider');
-    expect(movies.length).toBe(1);
+    expect(movies).toHaveLength(1);
     expect(movies[0].title).toBe('Spider-Man');
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/cartelera?busqueda=Spider'),
@@ -75,7 +75,7 @@ describe('carteleraService', () => {
     global.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error'));
 
     const movies = await carteleraService.getCarteleraHoy();
-    expect(movies.length).toBe(8);
+    expect(movies).toHaveLength(8);
     expect(movies[0].title).toBe('Spider-Man: Un Nuevo Día');
   });
 
