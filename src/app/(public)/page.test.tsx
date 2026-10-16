@@ -1,9 +1,12 @@
-import { render } from '@testing-library/react';
+import { render, act, RenderResult } from '@testing-library/react';
 import PublicPage from './page';
 
 describe('PublicPage Component', () => {
-  test('renderiza la página pública correctamente', () => {
-    const { container } = render(<PublicPage />);
-    expect(container).toBeDefined();
+  test('renderiza la página pública correctamente', async () => {
+    let result: RenderResult | undefined;
+    await act(async () => {
+      result = render(<PublicPage />);
+    });
+    expect(result?.container).toBeDefined();
   });
 });

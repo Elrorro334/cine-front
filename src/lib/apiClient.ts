@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7294/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5203/api';
 
 /**
  * Petición HTTP genérica con inyección de JWT

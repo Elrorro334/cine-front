@@ -9,6 +9,7 @@ import { PeliculaCarteleraDto } from '@/types/api';
 import SeatMapModal from '@/components/pos/SeatMapModal';
 import QrScannerModal from '@/components/pos/QrScannerModal';
 import ThermalTicketModal from '@/components/pos/ThermalTicketModal';
+import TmdbRegisterModal from '@/components/pos/TmdbRegisterModal';
 
 interface CartItem {
   id: string;
@@ -38,6 +39,7 @@ export default function PosPage() {
   const [isSeatModalOpen, setIsSeatModalOpen] = useState<boolean>(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState<boolean>(false);
+  const [isTmdbModalOpen, setIsTmdbModalOpen] = useState<boolean>(false);
 
   const [selectedPeli, setSelectedPeli] = useState<PeliculaCarteleraDto | null>(null);
   const [selectedHorario, setSelectedHorario] = useState<string>('');
@@ -45,13 +47,51 @@ export default function PosPage() {
   const [metodoPago, setMetodoPago] = useState<'Efectivo' | 'Tarjeta Mercado Pago'>('Efectivo');
   const [ticketFolio, setTicketFolio] = useState<string>('');
 
+  const fetchCartelera = async (term?: string) => {
+    try {
+      setLoadingCartelera(true);
+      const data = await taquillaService.getCartelera(term);
+      setCartelera(data);
+    } catch (err: unknown) {
+      const error = err as { status?: number };
+      if (error?.status === 401) {
+        authService.logout();
+        router.push('/');
+      }
+    } finally {
+      setLoadingCartelera(false);
+    }
+  };
+
   useEffect(() => {
+    let isMounted = true;
     const session = authService.getUserSession();
     if (!session) {
       router.push('/');
       return;
     }
-    void fetchCartelera();
+
+    async function loadCartelera() {
+      try {
+        setLoadingCartelera(true);
+        const data = await taquillaService.getCartelera();
+        if (isMounted) {
+          setCartelera(data);
+        }
+      } catch (err: unknown) {
+        const error = err as { status?: number };
+        if (error?.status === 401) {
+          authService.logout();
+          router.push('/');
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingCartelera(false);
+        }
+      }
+    }
+
+    void loadCartelera();
 
     const interval = setInterval(() => {
       setReloj(
@@ -63,23 +103,11 @@ export default function PosPage() {
       );
     }, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [router]);
-
-  const fetchCartelera = async (term?: string) => {
-    try {
-      setLoadingCartelera(true);
-      const data = await taquillaService.getCartelera(term);
-      setCartelera(data);
-    } catch (error: any) {
-      if (error?.status === 401) {
-        authService.logout();
-        router.push('/');
-      }
-    } finally {
-      setLoadingCartelera(false);
-    }
-  };
 
   const totalGeneral = carrito.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
 
@@ -162,6 +190,14 @@ export default function PosPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsTmdbModalOpen(true)}
+              className="bg-[#E11D2F] hover:bg-[#c81928] text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase flex items-center gap-1.5 transition shadow"
+            >
+              <i className="fa-solid fa-film text-xs"></i>
+              <span>+ Película (TMDB)</span>
+            </button>
             <button
               type="button"
               onClick={() => setIsQrModalOpen(true)}
@@ -309,6 +345,12 @@ export default function PosPage() {
           total={totalGeneral}
           metodoPago={metodoPago}
           onNewSale={resetVenta}
+        />
+
+        <TmdbRegisterModal
+          isOpen={isTmdbModalOpen}
+          onClose={() => setIsTmdbModalOpen(false)}
+          onMovieRegistered={() => void fetchCartelera()}
         />
       </div>
     </>
