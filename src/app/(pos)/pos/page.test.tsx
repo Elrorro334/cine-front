@@ -48,4 +48,13 @@ describe('PosPage Component', () => {
       expect(screen.getByText(/Spider-Man/i)).toBeInTheDocument();
     });
   });
+
+  test('abre el modal de registro TMDB al hacer clic en + Película (TMDB)', async () => {
+    render(<PosPage />);
+
+    const tmdbBtn = screen.getByRole('button', { name: /\+ Película \(TMDB\)/i });
+    fireEvent.click(tmdbBtn);
+
+    expect(screen.getByText(/Registrar Película desde TMDB/i)).toBeInTheDocument();
+  });
 });

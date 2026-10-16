@@ -22,24 +22,35 @@ export default function LoginPage() {
   const [shakeCard, setShakeCard] = useState(false);
 
   useEffect(() => {
-    void verifyNetwork();
-  }, []);
-
-  const verifyNetwork = async () => {
-    try {
-      setCheckingNetwork(true);
-      const res = await authService.checkNetwork();
-      setIsAllowedIp(res.isAllowed);
-      setDetectedIp(res.ipDetected);
-      setNetworkMessage(res.message);
-    } catch (error: any) {
-      setIsAllowedIp(false);
-      setDetectedIp(error?.data?.ipDetected || DEMO_EXTERNAL_IP);
-      setNetworkMessage(error?.message || 'BLOQUEO POR RESTRICCIÓN DE RED (IP EXTERNA)');
-    } finally {
-      setCheckingNetwork(false);
+    let isMounted = true;
+    async function initNetwork() {
+      try {
+        setCheckingNetwork(true);
+        const res = await authService.checkNetwork();
+        if (isMounted) {
+          setIsAllowedIp(res.isAllowed);
+          setDetectedIp(res.ipDetected);
+          setNetworkMessage(res.message);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          const error = err as { data?: { ipDetected?: string }; message?: string };
+          setIsAllowedIp(false);
+          setDetectedIp(error?.data?.ipDetected || DEMO_EXTERNAL_IP);
+          setNetworkMessage(error?.message || 'BLOQUEO POR RESTRICCIÓN DE RED (IP EXTERNA)');
+        }
+      } finally {
+        if (isMounted) {
+          setCheckingNetwork(false);
+        }
+      }
     }
-  };
+
+    void initNetwork();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const triggerShake = () => {
     setShakeCard(true);
@@ -65,7 +76,7 @@ export default function LoginPage() {
       if (res.success) {
         setLoginStatus('authorized');
         setTimeout(() => {
-          router.push('/pos');
+          router.push('/dashboard');
         }, 600);
       } else {
         setLoginStatus('denied');
@@ -76,7 +87,8 @@ export default function LoginPage() {
         });
         triggerShake();
       }
-    } catch (error: any) {
+    } catch (err: unknown) {
+      const error = err as { message?: string };
       setLoginStatus('denied');
       setLoginError({
         title: 'Error de Autenticación',
@@ -136,7 +148,7 @@ export default function LoginPage() {
               <p className="text-[9px] font-bold text-[#F57C00] uppercase mt-1">Control de Acceso & Roles</p>
             </div>
 
-            <div className="bg-[#050505] border border-[#262626] rounded-2xl p-3 mb-6 text-xs flex justify-between font-mono">
+            <div className="bg-[#050505] border border-[#262626] rounded-2xl p-3 mb-6 text-xs flex justify-between font-mono" title={networkMessage}>
               <div className="flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 rounded-full ${getDotClassName()}`} />
                 <span className="text-white font-bold">{checkingNetwork ? 'Verificando red...' : `${detectedIp}`}</span>

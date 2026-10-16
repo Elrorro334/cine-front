@@ -44,9 +44,9 @@ describe('MovieDetailModal Component', () => {
 
     expect(screen.getByText('Resident Evil: Noche cero')).toBeInTheDocument();
     expect(screen.getByText(/Sobrevive a la noche/i)).toBeInTheDocument();
-    expect(screen.getByText('Clasif. B15')).toBeInTheDocument();
-    expect(screen.getByText('Terror, Acción')).toBeInTheDocument();
-    expect(screen.getByText(/• 2026/i)).toBeInTheDocument();
+    expect(screen.getByText(/Clasif\. B15/i)).toBeInTheDocument();
+    expect(screen.getByText('Terror')).toBeInTheDocument();
+    expect(screen.getByText(/93 min/i)).toBeInTheDocument();
     expect(screen.getByText('Un mensajero en un hospital...')).toBeInTheDocument();
     expect(screen.getByText('Director de prueba')).toBeInTheDocument();
     expect(screen.getByText('Actor 1, Actor 2')).toBeInTheDocument();
@@ -57,10 +57,10 @@ describe('MovieDetailModal Component', () => {
   test('permite seleccionar un horario y muestra la confirmación', () => {
     render(<MovieDetailModal isOpen={true} movie={mockMovie} onClose={mockOnClose} />);
 
-    const horarioBtn = screen.getByRole('button', { name: /11:30 Disponible/i });
+    const horarioBtn = screen.getByRole('button', { name: '11:30' });
     fireEvent.click(horarioBtn);
 
-    expect(screen.getByText(/Horario elegido: 11:30 hrs/i)).toBeInTheDocument();
+    expect(screen.getByText(/Función seleccionada: 11:30 hrs/i)).toBeInTheDocument();
   });
 
   test('llama a onClose al presionar el botón de cerrar y la tecla Escape', () => {

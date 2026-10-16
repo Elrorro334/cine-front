@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface SeatMapModalProps {
   isOpen: boolean;
@@ -23,11 +23,13 @@ export default function SeatMapModal({
   // Simulación de asientos ocupados (En el Sprint 2 se conectará al endpoint de Estado_Butacas_Funcion)
   const [occupiedSeats] = useState<string[]>(['A3', 'A4', 'C5', 'D2']);
 
-  useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setSelectedSeats([]);
     }
-  }, [isOpen]);
+  }
 
   if (!isOpen) return null;
 

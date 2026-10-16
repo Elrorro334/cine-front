@@ -27,25 +27,19 @@ describe('MovieCard Component', () => {
 
     expect(screen.getByText('Resident Evil: Noche cero')).toBeInTheDocument();
     expect(screen.getByText('Clasif. B15')).toBeInTheDocument();
-    expect(screen.getByText('Terror')).toBeInTheDocument();
-    expect(screen.getByText('93 min')).toBeInTheDocument();
-    expect(screen.getByText('★ 8.5')).toBeInTheDocument();
-    expect(screen.getByText('11:30')).toBeInTheDocument();
+    expect(screen.getAllByText(/Terror/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/93 min/i).length).toBeGreaterThan(0);
   });
 
   test('llama a onSelect al hacer clic en el botón de la tarjeta o en el póster', () => {
     render(<MovieCard movie={mockMovie} onSelect={mockOnSelect} />);
 
-    const selectButtons = screen.getAllByRole('button', { name: /Conocer más/i });
-    fireEvent.click(selectButtons[0]);
+    const selectButton = screen.getByRole('button', { name: /Consultar Horarios/i });
+    fireEvent.click(selectButton);
     expect(mockOnSelect).toHaveBeenCalledWith(mockMovie);
 
     const titleBtn = screen.getByRole('button', { name: 'Resident Evil: Noche cero' });
     fireEvent.click(titleBtn);
-    expect(mockOnSelect).toHaveBeenCalledWith(mockMovie);
-
-    const timeBtn = screen.getByRole('button', { name: '11:30' });
-    fireEvent.click(timeBtn);
     expect(mockOnSelect).toHaveBeenCalledWith(mockMovie);
   });
 

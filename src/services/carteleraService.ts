@@ -1,46 +1,14 @@
+import { apiFetch } from '@/lib/apiClient';
+import { getPosterUrl } from '@/lib/tmdb';
+import {
+  PeliculaCarteleraDto,
+  TmdbSearchResultDto,
+  TmdbMovieDetailDto,
+  RegistrarPeliculaDto,
+} from '@/types/api';
 import { Movie, Promotion } from '@/types/cartelera';
 
-const TMDB_API_KEY = 'a9b90184f1235d3b78c24e4b31e993b8';
-const TMDB_BASE = 'https://api.themoviedb.org/3';
-const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
-const TMDB_IMG_ORIGINAL = 'https://image.tmdb.org/t/p/original';
-
-// Horarios escalonados para las funciones del Cine Teatro Xilotzin
-const showtimeSlots: ReadonlyArray<ReadonlyArray<string>> = [
-  ['11:30', '15:00', '19:15', '22:00'],
-  ['12:15', '16:00', '20:30'],
-  ['13:00', '16:45', '21:15'],
-  ['10:45', '14:30', '18:00', '21:45'],
-  ['12:45', '17:15', '20:45'],
-  ['11:00', '15:30', '19:00', '22:15'],
-  ['13:30', '17:45', '21:00'],
-  ['14:00', '18:30', '21:30'],
-];
-
-// Catálogo base de respaldo en caso de falta de conexión
-const localCatalog: ReadonlyArray<{ id: number; title: string; showtimes: string[]; fallbackClassification: string }> = [
-  { id: 1, title: 'Caminos del Crimen', showtimes: ['10:30', '15:00', '19:30'], fallbackClassification: 'B15' },
-  { id: 2, title: 'Payaso terrifier', showtimes: ['12:30', '17:15', '22:00'], fallbackClassification: 'C' },
-  { id: 3, title: 'La posesion de la momia', showtimes: ['14:30', '19:00'], fallbackClassification: 'B' },
-  { id: 4, title: 'Spiderman', showtimes: ['11:00', '16:30', '21:15'], fallbackClassification: 'A' },
-  { id: 5, title: 'The Super Mario Bros. Movie', showtimes: ['13:00', '16:00', '18:45'], fallbackClassification: 'AA' },
-  { id: 6, title: 'Avatar: Fire and Ash', showtimes: ['15:30', '21:00'], fallbackClassification: 'B' },
-  { id: 7, title: "Five Nights at Freddy's 2", showtimes: ['17:45', '20:30', '23:15'], fallbackClassification: 'B15' },
-  { id: 8, title: 'Super Mario Galaxy', showtimes: ['09:00', '12:00', '14:45'], fallbackClassification: 'AA' },
-];
-
-const fallbackPosters: Record<number, string> = {
-  1: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=600',
-  2: 'https://images.unsplash.com/photo-1509281373149-e957c6296406?q=80&w=600',
-  3: 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?q=80&w=600',
-  4: 'https://images.unsplash.com/photo-1635805737707-575885ab0820?q=80&w=600',
-  5: 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600',
-  6: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=600',
-  7: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?q=80&w=600',
-  8: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=600',
-};
-
-// Promociones iniciales y vigentes del Cine Teatro Xilotzin
+// Promociones iniciales y vigentes del Cine Teatro Xilotzin (Banner informativo)
 const initialPromotions: Promotion[] = [
   {
     id: 1,
@@ -71,145 +39,189 @@ const initialPromotions: Promotion[] = [
   },
 ];
 
-interface TmdbGenre {
-  id: number;
-  name: string;
-}
-
-interface TmdbCrewMember {
-  job: string;
-  name: string;
-}
-
-interface TmdbCastMember {
-  name: string;
-}
-
-interface TmdbReleaseDateItem {
-  certification: string;
-}
-
-interface TmdbReleaseDatesResult {
-  iso_3166_1: string;
-  release_dates: TmdbReleaseDateItem[];
-}
-
-interface TmdbVideoItem {
-  site: string;
-  type: string;
-  key: string;
-}
-
-interface TmdbMovieDetailsResponse {
-  id: number;
-  title?: string;
-  tagline?: string;
-  overview?: string;
-  runtime?: number;
-  vote_average?: number;
-  poster_path?: string;
-  backdrop_path?: string;
-  release_date?: string;
-  genres?: TmdbGenre[];
-  credits?: {
-    crew?: TmdbCrewMember[];
-    cast?: TmdbCastMember[];
-  };
-  release_dates?: {
-    results?: TmdbReleaseDatesResult[];
-  };
-  videos?: {
-    results?: TmdbVideoItem[];
-  };
-}
-
-interface TmdbNowPlayingItem {
-  id: number;
-  title: string;
-  overview?: string;
-  poster_path?: string;
-  backdrop_path?: string;
-  vote_average?: number;
-  release_date?: string;
-}
-
-interface TmdbNowPlayingResponse {
-  results?: TmdbNowPlayingItem[];
-}
-
-const certificationMap: Record<string, string> = {
-  R: 'C',
-  'PG-13': 'B15',
-  PG: 'B',
-  G: 'AA',
-  'NC-17': 'C',
-};
-
-function resolveClassification(certRaw: string, fallback = 'B'): string {
-  if (!certRaw) return fallback;
-  return certificationMap[certRaw] ?? certRaw;
-}
-
-async function fetchMovieDetails(movieId: number, fallbackSlotIndex: number): Promise<Movie> {
-  const fallbackSlot = [...showtimeSlots[fallbackSlotIndex % showtimeSlots.length]];
-  const detailUrl = `${TMDB_BASE}/movie/${movieId}?api_key=${TMDB_API_KEY}&language=es-MX&append_to_response=release_dates,credits,videos`;
-  const detailRes = await fetch(detailUrl);
-
-  if (!detailRes.ok) {
-    throw new Error(`Failed to fetch movie details for ${movieId}`);
-  }
-
-  const d = (await detailRes.json()) as TmdbMovieDetailsResponse;
-
-  const mxRelease = d.release_dates?.results?.find((r) => r.iso_3166_1 === 'MX');
-  const usRelease = d.release_dates?.results?.find((r) => r.iso_3166_1 === 'US');
-  const certRaw = mxRelease?.release_dates?.[0]?.certification ?? usRelease?.release_dates?.[0]?.certification ?? '';
-
-  const director = d.credits?.crew?.find((c) => c.job === 'Director')?.name || 'Director Cinematográfico';
-  const actors = d.credits?.cast?.slice(0, 3).map((a) => a.name).join(', ') || 'Elenco estelar';
-  const mainGenre = d.genres?.[0]?.name || 'Cine';
-  const allGenres = d.genres?.map((g) => g.name).join(', ') || 'Cine';
-  const trailer = d.videos?.results?.find((v) => v.site === 'YouTube' && v.type === 'Trailer')?.key || null;
-
-  return {
-    id: d.id,
-    title: d.title || 'Película en Cartelera',
-    tagline: d.tagline || 'Gran Estreno en Pantalla Gigante',
-    classification: resolveClassification(certRaw, 'B'),
-    duration: d.runtime ? `${d.runtime} min` : '115 min',
-    genre: mainGenre,
-    allGenres: allGenres,
-    rating: d.vote_average ? d.vote_average.toFixed(1) : '8.5',
-    posterUrl: d.poster_path ? `${TMDB_IMG}${d.poster_path}` : 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=600',
-    backdropUrl: d.backdrop_path ? `${TMDB_IMG_ORIGINAL}${d.backdrop_path}` : '',
-    synopsis: d.overview || 'Disfruta de esta emocionante producción en nuestra pantalla gigante con audio cinematográfico inmersivo.',
-    releaseYear: d.release_date ? d.release_date.split('-')[0] : '2026',
-    director: director,
-    actors: actors,
-    trailerKey: trailer,
-    showtimes: fallbackSlot,
-  };
-}
-
-function getFallbackCatalog(): Movie[] {
-  return localCatalog.map((item) => ({
-    id: item.id,
-    title: item.title,
+// Catálogo de respaldo local si el backend no tiene conexión momentánea
+const fallbackCatalog: Movie[] = [
+  {
+    id: 1,
+    title: 'Spider-Man: Un Nuevo Día',
     tagline: 'Gran Función en Pantalla Gigante',
-    classification: item.fallbackClassification,
-    duration: '115 min',
-    genre: 'Estreno',
+    classification: 'B',
+    duration: '130 min',
+    genre: 'Acción',
     allGenres: 'Acción, Aventuras',
-    rating: '8.4',
-    posterUrl: fallbackPosters[item.id] || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=600',
+    rating: '8.9',
+    posterUrl: getPosterUrl('/fBFjaDWfNslvrs6bJjknmG27wOS.jpg'),
     backdropUrl: '',
-    synopsis: 'Vive la magia del cine tradicional en el corazón de Jilotepec. Sonido digital envolvente y la mejor dulcería.',
+    synopsis: 'Peter Parker equilibra su vida personal y protege la ciudad de una nueva amenaza en Jilotepec.',
     releaseYear: '2026',
-    director: 'Director Cinematográfico',
+    director: 'Sam Raimi',
+    actors: 'Reparto estelar',
+    trailerKey: null,
+    showtimes: ['14:00', '18:00', '21:15'],
+  },
+  {
+    id: 2,
+    title: 'Super Mario Bros. La película',
+    tagline: 'Aventura para Toda la Familia',
+    classification: 'AA',
+    duration: '92 min',
+    genre: 'Animación',
+    allGenres: 'Animación, Familia',
+    rating: '8.8',
+    posterUrl: getPosterUrl('/zNKs1T0VZuJiVuhuL5GSCNkGdxf.jpg'),
+    backdropUrl: '',
+    synopsis: 'Mario y Luigi viajan por un laberinto subterráneo para rescatar a la princesa.',
+    releaseYear: '2026',
+    director: 'Aaron Horvath',
     actors: 'Reparto oficial',
     trailerKey: null,
-    showtimes: item.showtimes,
-  }));
+    showtimes: ['12:00', '15:00', '17:30'],
+  },
+  {
+    id: 3,
+    title: 'Avatar',
+    tagline: 'Experiencia Visual Inmersiva',
+    classification: 'B',
+    duration: '190 min',
+    genre: 'Ciencia Ficción',
+    allGenres: 'Aventura, Ciencia Ficción',
+    rating: '8.7',
+    posterUrl: getPosterUrl('/8zHIgB6tP34Ie34ddllzLg3F4YP.jpg'),
+    backdropUrl: '',
+    synopsis: 'Jake Sully y Neytiri forman una familia y exploran los océanos de Pandora.',
+    releaseYear: '2026',
+    director: 'James Cameron',
+    actors: 'Reparto oficial',
+    trailerKey: null,
+    showtimes: ['16:00', '20:30'],
+  },
+  {
+    id: 4,
+    title: 'Terrifier',
+    tagline: 'Sólo para Mayores de Edad',
+    classification: 'C',
+    duration: '125 min',
+    genre: 'Terror',
+    allGenres: 'Terror, Suspenso',
+    rating: '8.2',
+    posterUrl: getPosterUrl('/fjXqhGmaeQpB73WerhrYU6HlyV5.jpg'),
+    backdropUrl: '',
+    synopsis: 'Art the Clown regresa para sembrar el terror entre los habitantes de la ciudad.',
+    releaseYear: '2026',
+    director: 'Damien Leone',
+    actors: 'Reparto oficial',
+    trailerKey: null,
+    showtimes: ['21:30', '23:45'],
+  },
+  {
+    id: 5,
+    title: 'Batman',
+    tagline: 'El Héroe que Jilotepec Merece',
+    classification: 'B15',
+    duration: '152 min',
+    genre: 'Acción',
+    allGenres: 'Acción, Suspenso',
+    rating: '9.0',
+    posterUrl: getPosterUrl('/mo7teil1qH0SxgLijnqeYP1Eb4w.jpg'),
+    backdropUrl: '',
+    synopsis: 'Batman se enfrenta al crimen y la corrupción desatada en Ciudad Gótica.',
+    releaseYear: '2026',
+    director: 'Christopher Nolan',
+    actors: 'Reparto oficial',
+    trailerKey: null,
+    showtimes: ['15:30', '19:00', '22:15'],
+  },
+  {
+    id: 6,
+    title: 'IntensaMente 2',
+    tagline: 'Nuevas Emociones en Pantalla Grande',
+    classification: 'A',
+    duration: '96 min',
+    genre: 'Animación',
+    allGenres: 'Animación, Familia',
+    rating: '8.6',
+    posterUrl: getPosterUrl('/4HEJdpcmTGm3BWWic31G4aCnuC6.jpg'),
+    backdropUrl: '',
+    synopsis: 'Riley entra a la adolescencia y nuevas emociones llegan al cuartel general.',
+    releaseYear: '2026',
+    director: 'Kelsey Mann',
+    actors: 'Reparto oficial',
+    trailerKey: null,
+    showtimes: ['11:00', '13:30', '16:00'],
+  },
+  {
+    id: 7,
+    title: 'Duna: Parte Dos',
+    tagline: 'El Destino de una Galaxia',
+    classification: 'B',
+    duration: '166 min',
+    genre: 'Ciencia Ficción',
+    allGenres: 'Aventura, Drama',
+    rating: '8.8',
+    posterUrl: getPosterUrl('/1Op57Khovv3ANSWn3TvhMStBboV.jpg'),
+    backdropUrl: '',
+    synopsis: 'Paul Atreides se une a Chani y a los Fremen en busca de venganza y paz.',
+    releaseYear: '2026',
+    director: 'Denis Villeneuve',
+    actors: 'Reparto oficial',
+    trailerKey: null,
+    showtimes: ['17:00', '20:45'],
+  },
+  {
+    id: 8,
+    title: 'Gladiador II',
+    tagline: 'El Retorno al Coliseo',
+    classification: 'B15',
+    duration: '148 min',
+    genre: 'Acción',
+    allGenres: 'Acción, Historia',
+    rating: '8.5',
+    posterUrl: getPosterUrl('/fbcs5AxrdXwyj1b8bGGMgC9kXrM.jpg'),
+    backdropUrl: '',
+    synopsis: 'Años después de la muerte de Máximo, un nuevo héroe lucha en el Coliseo por la libertad.',
+    releaseYear: '2026',
+    director: 'Ridley Scott',
+    actors: 'Reparto oficial',
+    trailerKey: null,
+    showtimes: ['18:30', '21:30'],
+  },
+];
+
+function formatShowtime(horaRaw: string): string {
+  if (!horaRaw) return '16:00';
+  if (horaRaw.includes(' ')) {
+    return horaRaw.split(' ')[1].substring(0, 5);
+  }
+  if (horaRaw.includes('T')) {
+    return horaRaw.split('T')[1].substring(0, 5);
+  }
+  return horaRaw.substring(0, 5);
+}
+
+function mapDtoToMovie(dto: PeliculaCarteleraDto): Movie {
+  const posterRaw = dto.poster_path || dto.poster_image;
+  const posterUrl = getPosterUrl(posterRaw);
+
+  return {
+    id: dto.idPelicula,
+    title: dto.titulo,
+    tagline: 'En Exhibición Hoy',
+    classification: dto.clasificacion || 'B',
+    duration: dto.duracion ? `${dto.duracion} min` : '115 min',
+    genre: 'Estreno',
+    allGenres: 'Cine',
+    rating: '8.5',
+    posterUrl,
+    backdropUrl: posterUrl,
+    synopsis: dto.sinopsis || 'Vive la experiencia cinematográfica en la pantalla gigante del Cine Teatro Xilotzin.',
+    releaseYear: '2026',
+    director: dto.director || 'Director Cinematográfico',
+    actors: 'Reparto estelar',
+    trailerKey: null,
+    showtimes: dto.funciones && dto.funciones.length > 0
+      ? dto.funciones.map((f) => formatShowtime(f.hora))
+      : ['14:00', '17:30', '20:45'],
+  };
 }
 
 export const carteleraService = {
@@ -218,35 +230,64 @@ export const carteleraService = {
   },
 
   /**
-   * Obtiene la cartelera actual directamente desde la API oficial de películas en cines de México (now_playing).
-   * Si la API no responde, utiliza de respaldo el catálogo local garantizado.
+   * Obtiene la cartelera pública desde la API REST de .NET Core (cine-back)
+   * Cumple con la regla de arquitectura API-First: sin llamadas externas ni ORM en el front.
    */
-  async getCarteleraHoy(): Promise<Movie[]> {
+  async getCarteleraHoy(busqueda?: string): Promise<Movie[]> {
     try {
-      const nowPlayingUrl = `${TMDB_BASE}/movie/now_playing?api_key=${TMDB_API_KEY}&language=es-MX&region=MX&page=1`;
-      const res = await fetch(nowPlayingUrl);
+      const query = busqueda ? `?busqueda=${encodeURIComponent(busqueda)}` : '';
+      const data = await apiFetch<PeliculaCarteleraDto[]>(`/cartelera${query}`);
 
-      if (res.ok) {
-        const data = (await res.json()) as TmdbNowPlayingResponse;
-        const currentMovies = data.results?.slice(0, 8) ?? [];
-
-        if (currentMovies.length > 0) {
-          const detailedPromises = currentMovies.map((movie, index) =>
-            fetchMovieDetails(movie.id, index).catch(() => null)
-          );
-
-          const results = await Promise.all(detailedPromises);
-          const validMovies = results.filter((m): m is Movie => m !== null);
-
-          if (validMovies.length > 0) {
-            return validMovies;
-          }
-        }
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map(mapDtoToMovie);
       }
 
-      return getFallbackCatalog();
+      return fallbackCatalog;
     } catch {
-      return getFallbackCatalog();
+      return fallbackCatalog;
     }
+  },
+
+  /**
+   * Busca películas en TheMovieDB a través del backend de .NET Core (panel administrativo)
+   */
+  async buscarTmdb(query: string): Promise<TmdbSearchResultDto[]> {
+    if (!query.trim()) return [];
+    return apiFetch<TmdbSearchResultDto[]>(
+      `/cartelera/buscar-tmdb?query=${encodeURIComponent(query.trim())}`
+    );
+  },
+
+  /**
+   * Obtiene los detalles completos de una película en TMDB vía backend
+   */
+  async obtenerDetalleTmdb(tmdbId: number): Promise<TmdbMovieDetailDto> {
+    return apiFetch<TmdbMovieDetailDto>(`/cartelera/detalle-tmdb/${tmdbId}`);
+  },
+
+  /**
+   * Registra una nueva película en SQL Server persistiendo solo la ruta relativa
+   */
+  async registrarPelicula(dto: RegistrarPeliculaDto): Promise<PeliculaCarteleraDto> {
+    const payload = {
+      ...dto,
+      posterPath: dto.posterPath || dto.posterImage || '',
+      posterImage: dto.posterImage || dto.posterPath || '',
+    };
+    return apiFetch<PeliculaCarteleraDto>('/cartelera/registrar', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Da de baja / elimina una película de la cartelera en SQL Server
+   */
+  async eliminarPelicula(idPelicula: number): Promise<boolean> {
+    const res = await apiFetch<{ success: boolean; message: string }>(
+      `/cartelera/pelicula/${idPelicula}`,
+      { method: 'DELETE' }
+    );
+    return res.success;
   },
 };
