@@ -2,7 +2,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import LoginPage from './page';
 import { authService } from '@/services/authService';
 
-
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: jest.fn(),
@@ -37,18 +36,21 @@ describe('LoginPage Component', () => {
     });
   });
 
-  test('permite cargar el preset Admin y realizar login', async () => {
+  test('permite ingresar credenciales y realizar login', async () => {
     render(<LoginPage />);
 
     await waitFor(() => {
       expect(screen.getByText('192.168.1.105')).toBeInTheDocument();
     });
 
-    const adminBtn = screen.getByRole('button', { name: /Admin/i });
-    fireEvent.click(adminBtn);
-
     const userInput = screen.getByLabelText(/Usuario \/ Perfil/i) as HTMLInputElement;
+    const passInput = screen.getByLabelText(/Contraseña/i) as HTMLInputElement;
+
+    fireEvent.change(userInput, { target: { value: 'admin' } });
+    fireEvent.change(passInput, { target: { value: 'admin123' } });
+
     expect(userInput.value).toBe('admin');
+    expect(passInput.value).toBe('admin123');
 
     const submitBtn = screen.getByRole('button', { name: /Validar e Ingresar/i });
     fireEvent.click(submitBtn);

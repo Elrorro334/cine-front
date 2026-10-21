@@ -15,6 +15,11 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      if (movie && movie.showtimes.length > 0) {
+        setSelectedHorario(movie.showtimes[0]);
+      } else {
+        setSelectedHorario(null);
+      }
     } else {
       document.body.style.overflow = 'unset';
     }
@@ -30,9 +35,13 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
       document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, movie, onClose]);
 
   if (!isOpen || !movie) return null;
+
+  const selectedFuncion = movie.funciones?.find((f) => f.hora === selectedHorario) ?? movie.funciones?.[0];
+  const precioDisplay = selectedFuncion ? selectedFuncion.precio : 50;
+  const salaDisplay = selectedFuncion?.nombreSala || 'Sala Principal';
 
   return (
     <dialog
@@ -58,7 +67,7 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
           className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 sm:w-10 sm:h-10 bg-[#0A0A0A] rounded-full flex items-center justify-center text-white hover:bg-[#E11D2F] hover:scale-110 transition-all z-20 shadow-lg border border-[#262626]"
           aria-label="Cerrar ficha técnica"
         >
-          ✕
+          <i className="fa-solid fa-xmark text-lg" />
         </button>
 
         {/* Columna Izquierda: Póster con gradiente */}
@@ -95,44 +104,48 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
           {/* Badges Info */}
           <div className="flex flex-wrap items-center gap-2.5 mb-6 text-xs font-sans text-[#E0E0E0] uppercase tracking-widest font-bold">
             <span className="flex items-center gap-1.5 bg-[#0A0A0A] px-3 py-1.5 rounded-md border border-[#262626]">
-              ⏱ {movie.duration}
+              <i className="fa-solid fa-clock text-[#E11D2F]" /> {movie.duration}
             </span>
             <span className="flex items-center gap-1.5 bg-[#0A0A0A] px-3 py-1.5 rounded-md border border-[#262626]">
-              🏷 Clasif. {movie.classification}
+              <i className="fa-solid fa-tag text-[#E11D2F]" /> Clasif. {movie.classification}
             </span>
             <span className="flex items-center gap-1.5 bg-[#0A0A0A] px-3 py-1.5 rounded-md border border-[#262626]">
-              ★ {movie.rating || '8.5'}/10
+              <i className="fa-solid fa-star text-yellow-400" /> {movie.rating || '8.5'}/10
             </span>
           </div>
 
-          {/* Horarios de Funciones Disponibles (Copiado de Xilotzin) */}
+          {/* Horarios de Funciones Disponibles (Dinámicos desde BD) */}
           <div className="mb-6 bg-[#0A0A0A]/70 p-4 rounded-xl border border-[#262626]">
             <h4 className="font-sans font-bold text-white uppercase tracking-widest text-xs mb-3 flex items-center justify-between">
-              <span>🕒 Horarios Disponibles:</span>
-              <span className="text-[10px] text-[#A0A0A0] font-normal">Acceso General ($50 MXN)</span>
+              <span className="flex items-center gap-1.5"><i className="fa-solid fa-calendar-day text-[#E11D2F]" /> Horarios Disponibles:</span>
+              <span className="text-[10px] text-[#A0A0A0] font-normal">Acceso General (${precioDisplay} MXN)</span>
             </h4>
-            <div className="flex flex-wrap gap-2.5">
-              {movie.showtimes.map((hora) => {
-                const isSelected = selectedHorario === hora;
-                return (
-                  <button
-                    key={hora}
-                    type="button"
-                    onClick={() => setSelectedHorario(hora)}
-                    className={`px-4 py-2 rounded-xl font-mono text-xs font-bold uppercase transition-all ${
-                      isSelected
-                        ? 'bg-[#E11D2F] text-white shadow-lg shadow-[#E11D2F]/30 scale-105'
-                        : 'bg-[#121212] border border-[#262626] text-white hover:border-[#E11D2F]'
-                    }`}
-                  >
-                    {hora}
-                  </button>
-                );
-              })}
-            </div>
+            {movie.showtimes.length > 0 ? (
+              <div className="flex flex-wrap gap-2.5">
+                {movie.showtimes.map((hora) => {
+                  const isSelected = selectedHorario === hora;
+                  return (
+                    <button
+                      key={hora}
+                      type="button"
+                      onClick={() => setSelectedHorario(hora)}
+                      className={`px-4 py-2 rounded-xl font-mono text-xs font-bold uppercase transition-all ${
+                        isSelected
+                          ? 'bg-[#E11D2F] text-white shadow-lg shadow-[#E11D2F]/30 scale-105'
+                          : 'bg-[#121212] border border-[#262626] text-white hover:border-[#E11D2F]'
+                      }`}
+                    >
+                      {hora}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-[#a3a3a3] italic">No hay funciones programadas para hoy.</p>
+            )}
             {selectedHorario && (
               <p className="mt-3 text-xs text-emerald-400 font-sans font-semibold">
-                ✓ Función seleccionada: {selectedHorario} hrs en Sala 1
+                <i className="fa-solid fa-circle-check text-emerald-400 mr-1.5" /> Función seleccionada: {selectedHorario} hrs en {salaDisplay}
               </p>
             )}
           </div>

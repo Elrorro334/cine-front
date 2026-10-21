@@ -37,3 +37,32 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
 
   return data as T;
 }
+
+/**
+ * Descarga de archivos binarios (ej. CSV, Excel, Reportes) con inyección de JWT
+ */
+export async function apiDownload(endpoint: string, options: RequestInit = {}): Promise<Blob> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('cine_token') : null;
+
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    throw {
+      status: response.status,
+      message: `Error al descargar archivo: ${response.status}`,
+    };
+  }
+
+  return response.blob();
+}

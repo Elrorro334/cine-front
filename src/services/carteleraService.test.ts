@@ -71,12 +71,11 @@ describe('carteleraService', () => {
     );
   });
 
-  test('getCarteleraHoy retorna el catálogo de respaldo si la API falla o está vacía', async () => {
+  test('getCarteleraHoy retorna arreglo vacío si la API falla o está vacía', async () => {
     global.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error'));
 
     const movies = await carteleraService.getCarteleraHoy();
-    expect(movies).toHaveLength(8);
-    expect(movies[0].title).toBe('Spider-Man: Un Nuevo Día');
+    expect(movies).toEqual([]);
   });
 
   test('buscarTmdb retorna lista de resultados desde el backend de .NET', async () => {
@@ -140,4 +139,3 @@ describe('carteleraService', () => {
     );
   });
 });
-

@@ -28,7 +28,7 @@ export default function QrScannerModal({
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 bg-black/90 backdrop-blur-md">
       <div className="bg-[#111111] border-2 border-[#D81B60] rounded-2xl max-w-lg w-full p-6 text-center relative">
-        <button type="button" onClick={onClose} className="absolute top-3 right-3 text-[#a3a3a3] hover:text-white">✕</button>
+        <button type="button" onClick={onClose} className="absolute top-3 right-3 text-[#a3a3a3] hover:text-white"><i className="fa-solid fa-xmark text-lg" /></button>
         <h3 className="text-lg font-black uppercase text-white mb-2">Lectura de Código QR</h3>
 
         <form onSubmit={handleSubmit} className="space-y-3">

@@ -14,7 +14,7 @@ const CLASSIFICATIONS = ['Todas', 'AA', 'A', 'B', 'B15', 'C'] as const;
 
 export default function PublicPage() {
   const [movies, setMovies] = useState<Movie[]>([]);
-  const [promotions] = useState<Promotion[]>(() => carteleraService.getPromociones());
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedClassification, setSelectedClassification] = useState<string>('Todas');
@@ -24,12 +24,16 @@ export default function PublicPage() {
 
   useEffect(() => {
     let isMounted = true;
-    async function loadCartelera() {
+    async function loadData() {
       try {
         setLoading(true);
-        const data = await carteleraService.getCarteleraHoy();
+        const [carteleraData, promoData] = await Promise.all([
+          carteleraService.getCarteleraHoy(),
+          carteleraService.getPromociones(),
+        ]);
         if (isMounted) {
-          setMovies(data);
+          setMovies(carteleraData);
+          setPromotions(promoData);
         }
       } finally {
         if (isMounted) {
@@ -38,7 +42,7 @@ export default function PublicPage() {
       }
     }
 
-    void loadCartelera();
+    void loadData();
 
     return () => {
       isMounted = false;
@@ -93,21 +97,25 @@ export default function PublicPage() {
       return (
         <div className="py-16 text-center space-y-3 bg-[#121212] border border-[#262626] rounded-3xl p-8 max-w-lg mx-auto">
           <p className="text-base font-bold text-white uppercase">
-            No se encontraron películas
+            {searchQuery ? 'No se encontraron películas' : 'Cartelera del Día no disponible'}
           </p>
           <p className="text-xs text-[#A0A0A0]">
-            No hay títulos en cartelera que coincidan con &ldquo;{searchQuery}&rdquo;.
+            {searchQuery
+              ? `No hay títulos en cartelera que coincidan con "${searchQuery}".`
+              : 'No hay funciones programadas para hoy en este momento en la base de datos.'}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              setSearchQuery('');
-              setSelectedClassification('Todas');
-            }}
-            className="mt-2 px-4 py-2 rounded-xl bg-[#262626] text-xs font-bold text-white hover:bg-[#E11D2F] transition-colors"
-          >
-            Restablecer Filtros
-          </button>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedClassification('Todas');
+              }}
+              className="mt-2 px-4 py-2 rounded-xl bg-[#262626] text-xs font-bold text-white hover:bg-[#E11D2F] transition-colors"
+            >
+              Restablecer Filtros
+            </button>
+          )}
         </div>
       );
     }
@@ -144,7 +152,7 @@ export default function PublicPage() {
 
         <div className="relative z-10 text-center px-4 sm:px-6 max-w-4xl mx-auto flex flex-col items-center">
           <span className="bg-[#E11D2F]/30 border border-[#E11D2F]/50 text-white font-sans font-bold text-[9px] sm:text-[10px] md:text-xs uppercase tracking-[0.25em] sm:tracking-[0.3em] px-3 sm:px-4 py-1 sm:py-1.5 rounded-full mb-3 sm:mb-4 shadow-lg flex items-center gap-2">
-            ✨ Pantalla Gigante • Sonido Digital • Jilotepec
+            <i className="fa-solid fa-star text-yellow-400 mr-1.5" /> Pantalla Gigante • Sonido Digital • Jilotepec
           </span>
           <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-['Playfair_Display',serif] font-black uppercase tracking-tight text-white mb-2 sm:mb-3 leading-tight md:leading-none drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
             La Magia del <br />
@@ -162,7 +170,7 @@ export default function PublicPage() {
       <section className="max-w-7xl mx-auto px-4 md:px-6 pt-10 pb-4 w-full">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-sans font-bold uppercase tracking-[0.25em] text-[#A0A0A0] flex items-center gap-2">
-            <span className="text-[#E11D2F]">📢</span> Avisos & Novedades del Cine
+            <i className="fa-solid fa-bullhorn text-[#E11D2F] mr-2" /> Avisos & Novedades del Cine
           </h2>
         </div>
         <PromotionsBanner promotions={promotions} />
@@ -202,69 +210,38 @@ export default function PublicPage() {
             })}
           </div>
 
-          <div className="relative">
+          <div className="relative w-full sm:w-72">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por título..."
-              className="w-full sm:w-64 bg-[#121212] border border-[#262626] rounded-xl px-4 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#E11D2F] transition-colors"
-              aria-label="Buscar película"
+              placeholder="Buscar título o género..."
+              className="w-full bg-[#121212] text-white placeholder-[#737373] text-xs px-4 py-2.5 rounded-xl border border-[#262626] focus:border-[#E11D2F] focus:outline-none transition-colors"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white text-xs"
-                aria-label="Limpiar búsqueda"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white text-xs"
               >
-                ✕
+                <i className="fa-solid fa-xmark" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Grilla de Películas (Tarjetas limpias con relación de aspecto 2/3 y 4 columnas en desktop) */}
+        {/* Render de la Cartelera (Grid o Estado Vacío) */}
         {renderCarteleraGrid()}
-
-
-        {/* Sección Informativa Institucional (Tradición Jilotepec) */}
-        <section className="p-6 sm:p-8 rounded-3xl bg-[#121212] border border-[#262626] grid grid-cols-1 md:grid-cols-3 gap-6 text-center md:text-left">
-          <div className="space-y-1">
-            <h3 className="font-['Playfair_Display',serif] text-base font-black text-white uppercase">
-              Ubicación y Taquilla
-            </h3>
-            <p className="text-xs text-[#A0A0A0]">
-              Centro Histórico de Jilotepec, Estado de México. Frente al jardín principal.
-            </p>
-          </div>
-          <div className="space-y-1">
-            <h3 className="font-['Playfair_Display',serif] text-base font-black text-white uppercase">
-              Precio General
-            </h3>
-            <p className="text-xs text-[#A0A0A0]">
-              Boleto general a $50.00 MXN. Pregunta en taquilla por nuestras promociones de 2x1 los miércoles.
-            </p>
-          </div>
-          <div className="space-y-1">
-            <h3 className="font-['Playfair_Display',serif] text-base font-black text-white uppercase">
-              Dulcería Tradicional
-            </h3>
-            <p className="text-xs text-[#A0A0A0]">
-              Palomitas recién hechas, nachos con queso artesanal, refrescos y combos familiares.
-            </p>
-          </div>
-        </section>
       </main>
 
-      {/* Modal de Ficha Técnica Detallada */}
+      {/* Modal Ficha Técnica y Horarios */}
       <MovieDetailModal
         movie={selectedMovie}
         isOpen={isModalOpen}
         onClose={handleCloseDetail}
       />
 
-      {/* Footer Institucional con 4 Columnas */}
+      {/* Footer Oficial */}
       <PublicFooter />
     </div>
   );
