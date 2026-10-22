@@ -5,13 +5,23 @@ import { taquillaService } from '@/services/taquillaService';
 import { ButacaDto } from '@/types/api';
 
 interface SeatMapModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  peliculaTitle: string;
-  horario: string;
-  idFuncion?: number;
-  precioBoleto?: number;
-  onConfirmSeats: (asientos: string[]) => void;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly peliculaTitle: string;
+  readonly horario: string;
+  readonly idFuncion?: number;
+  readonly precioBoleto?: number;
+  readonly onConfirmSeats: (asientos: string[]) => void;
+}
+
+function getSeatButtonStyle(isOcupado: boolean, isSelected: boolean): string {
+  if (isOcupado) {
+    return 'bg-red-950/40 text-red-700 border border-red-900/40 cursor-not-allowed opacity-50';
+  }
+  if (isSelected) {
+    return 'bg-[#D81B60] text-white border border-pink-400 scale-105 shadow-[0_0_10px_rgba(216,27,96,0.8)]';
+  }
+  return 'bg-[#050505] text-[#a3a3a3] hover:text-white border border-[#262626] hover:border-[#D81B60]';
 }
 
 export default function SeatMapModal({
@@ -63,7 +73,7 @@ export default function SeatMapModal({
   if (!isOpen) return null;
 
   // Filas únicas derivadas directamente de la base de datos
-  const filas = Array.from(new Set(butacas.map((b) => b.fila))).sort();
+  const filas = Array.from(new Set(butacas.map((b) => b.fila))).sort((a, b) => a.localeCompare(b));
 
   const toggleAsiento = (asientoCodigo: string, estaOcupada: boolean) => {
     if (estaOcupada) return;
@@ -108,7 +118,7 @@ export default function SeatMapModal({
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="text-[#a3a3a3] hover:text-white">
+          <button type="button" onClick={onClose} aria-label="Cerrar selector de butacas" className="text-[#a3a3a3] hover:text-white">
             <i className="fa-solid fa-xmark text-lg" />
           </button>
         </div>
@@ -163,13 +173,7 @@ export default function SeatMapModal({
                           type="button"
                           disabled={isOcupado}
                           onClick={() => toggleAsiento(b.codigo, isOcupado)}
-                          className={`w-6 h-6 rounded font-mono text-[9px] font-bold transition-all ${
-                            isOcupado
-                              ? 'bg-red-950/40 text-red-700 border border-red-900/40 cursor-not-allowed opacity-50'
-                              : isSelected
-                              ? 'bg-[#D81B60] text-white border border-pink-400 scale-105 shadow-[0_0_10px_rgba(216,27,96,0.8)]'
-                              : 'bg-[#050505] text-[#a3a3a3] hover:text-white border border-[#262626] hover:border-[#D81B60]'
-                          }`}
+                          className={`w-6 h-6 rounded font-mono text-[9px] font-bold transition-all ${getSeatButtonStyle(isOcupado, isSelected)}`}
                         >
                           {b.numero}
                         </button>

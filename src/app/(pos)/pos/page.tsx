@@ -384,16 +384,18 @@ export default function PosPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {loadingCartelera ? (
+                  {loadingCartelera && (
                     <div className="col-span-full py-16 text-center text-xs text-[#a3a3a3] font-mono">
                       <i className="fa-solid fa-spinner fa-spin text-xl text-[#D81B60] block mb-2" />
                       Cargando cartelera desde base de datos...
                     </div>
-                  ) : cartelera.length === 0 ? (
+                  )}
+                  {!loadingCartelera && cartelera.length === 0 && (
                     <div className="col-span-full py-16 text-center text-xs text-[#a3a3a3]">
                       No hay películas con funciones programadas para hoy.
                     </div>
-                  ) : (
+                  )}
+                  {!loadingCartelera && cartelera.length > 0 && (
                     cartelera.map((pelicula) => (
                       <div key={pelicula.idPelicula} className="bg-[#111111] border border-[#262626] rounded-xl p-4 space-y-3 shadow-lg hover:border-[#D81B60]/40 transition">
                         <div className="flex items-start justify-between gap-2">

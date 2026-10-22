@@ -4,6 +4,16 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { dashboardService } from '@/services/dashboardService';
 import { DashboardFinancieroDto } from '@/types/api';
 
+function getTransactionBadgeStyle(tipoTransaccion: string): string {
+  if (tipoTransaccion === 'Taquilla') {
+    return 'bg-[#D81B60]/20 text-pink-300 border border-[#D81B60]/40';
+  }
+  if (tipoTransaccion === 'Dulcería') {
+    return 'bg-[#F57C00]/20 text-amber-300 border border-[#F57C00]/40';
+  }
+  return 'bg-purple-950/40 text-purple-300 border border-purple-800/40';
+}
+
 export default function FinancialDashboardView() {
   const [data, setData] = useState<DashboardFinancieroDto | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -418,12 +428,13 @@ export default function FinancialDashboardView() {
 
         {/* Contenido Tabla */}
         <div className="overflow-x-auto">
-          {loading ? (
+          {loading && (
             <div className="py-20 text-center text-xs text-[#a3a3a3] font-mono">
               <i className="fa-solid fa-spinner fa-spin text-2xl text-[#D81B60] block mb-3" />
               Calculando métricas y cargando transacciones desde SQL Server...
             </div>
-          ) : transaccionesFiltradas.length === 0 ? (
+          )}
+          {!loading && transaccionesFiltradas.length === 0 && (
             <div className="py-20 text-center text-xs text-[#737373] space-y-2">
               <i className="fa-solid fa-inbox text-3xl text-neutral-600 block mb-2" />
               <p className="font-bold text-[#a3a3a3] uppercase text-xs">
@@ -433,7 +444,8 @@ export default function FinancialDashboardView() {
                 Prueba seleccionando otra Semana Cinematográfica o un rango de fechas diferente.
               </p>
             </div>
-          ) : (
+          )}
+          {!loading && transaccionesFiltradas.length > 0 && (
             <table className="w-full text-left text-xs">
               <thead className="bg-[#050505] text-[#a3a3a3] uppercase font-mono text-[10px] border-b border-[#262626]">
                 <tr>
@@ -475,13 +487,7 @@ export default function FinancialDashboardView() {
                       </td>
                       <td className="py-3 px-4">
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-sans ${
-                            t.tipoTransaccion === 'Taquilla'
-                              ? 'bg-[#D81B60]/20 text-pink-300 border border-[#D81B60]/40'
-                              : t.tipoTransaccion === 'Dulcería'
-                              ? 'bg-[#F57C00]/20 text-amber-300 border border-[#F57C00]/40'
-                              : 'bg-purple-950/40 text-purple-300 border border-purple-800/40'
-                          }`}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-sans ${getTransactionBadgeStyle(t.tipoTransaccion)}`}
                         >
                           {t.tipoTransaccion}
                         </span>
