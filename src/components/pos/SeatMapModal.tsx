@@ -151,7 +151,7 @@ export default function SeatMapModal({
         {loading ? (
           <div className="py-12 text-center text-xs text-[#a3a3a3] font-mono">
             <i className="fa-solid fa-spinner fa-spin text-lg text-[#D81B60] block mb-2" />
-            Consultando disponibilidad en tiempo real...
+            <p>Consultando disponibilidad en tiempo real...</p>
           </div>
         ) : (
           <div className="bg-[#050505] p-3 rounded-2xl border border-[#262626] flex flex-col gap-2 items-center">
@@ -207,7 +207,8 @@ export default function SeatMapModal({
               onClick={autoAsignar}
               className="bg-[#050505] hover:bg-neutral-800 text-[#a3a3a3] hover:text-white border border-[#262626] py-2.5 px-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
             >
-              <i className="fa-solid fa-bolt text-yellow-400 text-xs" /> Asignar Auto (1)
+              <i className="fa-solid fa-bolt text-yellow-400 text-xs" />
+              <span>Asignar Auto (1)</span>
             </button>
             <button
               type="button"
@@ -215,7 +216,8 @@ export default function SeatMapModal({
               onClick={handleConfirm}
               className="bg-[#D81B60] hover:bg-pink-600 disabled:opacity-40 text-white py-2.5 px-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5"
             >
-              <i className="fa-solid fa-check text-xs" /> Agregar a Venta
+              <i className="fa-solid fa-check text-xs" />
+              <span>Agregar a Venta</span>
             </button>
           </div>
         </div>

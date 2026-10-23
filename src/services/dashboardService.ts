@@ -1,12 +1,13 @@
 import { apiFetch, apiDownload } from '@/lib/apiClient';
-import {
-  DashboardFinancieroDto,
-  SemanaCinematograficaDto,
-} from '@/types/api';
+import { DashboardFinancieroDto, SemanaCinematograficaDto } from '@/types/api';
 
+/**
+ * Servicio para interacción con el módulo de Dashboard Financiero (/api/dashboard)
+ * Cumple con Criterios 1, 2 y 3 de HU-10
+ */
 export const dashboardService = {
   /**
-   * Obtiene el resumen financiero con los 4 KPIs clave y las transacciones detalladas
+   * Obtiene el resumen financiero, KPIs y transacciones detalladas
    */
   async getResumen(params?: {
     offsetSemanas?: number;
@@ -25,7 +26,7 @@ export const dashboardService = {
     }
 
     const qs = query.toString();
-    const endpoint = `/dashboard/resumen${qs ? `?${qs}` : ''}`;
+    const endpoint = qs ? `/dashboard/resumen?${qs}` : '/dashboard/resumen';
     return apiFetch<DashboardFinancieroDto>(endpoint);
   },
 
@@ -56,7 +57,7 @@ export const dashboardService = {
     }
 
     const qs = query.toString();
-    const endpoint = `/dashboard/exportar-transacciones${qs ? `?${qs}` : ''}`;
+    const endpoint = qs ? `/dashboard/exportar-transacciones?${qs}` : '/dashboard/exportar-transacciones';
     return apiDownload(endpoint);
   },
 };

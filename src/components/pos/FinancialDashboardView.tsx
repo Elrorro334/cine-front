@@ -69,7 +69,7 @@ export default function FinancialDashboardView() {
       link.download = `reporte_financiero_xilotzin_${stamp}.csv`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       window.URL.revokeObjectURL(url);
     } catch {
       alert('Error al generar y descargar el reporte CSV.');
@@ -158,9 +158,9 @@ export default function FinancialDashboardView() {
         {/* Selector de Semana Cinematográfica (Jueves a Miércoles) */}
         <div className="border-t border-[#262626] pt-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-[#a3a3a3] uppercase tracking-wider">
-              <i className="fa-solid fa-calendar-days text-[#F57C00] mr-1.5" />
-              Filtrar por:
+            <span className="text-[11px] font-bold text-[#a3a3a3] uppercase tracking-wider flex items-center gap-1.5">
+              <i className="fa-solid fa-calendar-days text-[#F57C00]" />
+              <span>Filtrar por:</span>
             </span>
             <div className="bg-[#050505] p-1 rounded-xl border border-[#262626] flex gap-1">
               <button
@@ -335,7 +335,7 @@ export default function FinancialDashboardView() {
               <div className="mt-2 space-y-1 text-xs font-mono">
                 <div className="flex justify-between items-center">
                   <span className="text-emerald-400 font-bold flex items-center gap-1">
-                    <i className="fa-solid fa-money-bill-wave text-[10px]" /> Efectivo:
+                    <i className="fa-solid fa-money-bill-wave text-[10px]" /> <span>Efectivo:</span>
                   </span>
                   <span className="text-white font-bold">
                     ${kpis?.efectivo?.total ?? 0} ({kpis?.efectivo?.porcentaje?.toFixed(0) ?? 0}%)
@@ -343,7 +343,7 @@ export default function FinancialDashboardView() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sky-400 font-bold flex items-center gap-1">
-                    <i className="fa-solid fa-credit-card text-[10px]" /> Tarjeta:
+                    <i className="fa-solid fa-credit-card text-[10px]" /> <span>Tarjeta:</span>
                   </span>
                   <span className="text-white font-bold">
                     ${kpis?.tarjeta?.total ?? 0} ({kpis?.tarjeta?.porcentaje?.toFixed(0) ?? 0}%)
@@ -431,7 +431,7 @@ export default function FinancialDashboardView() {
           {loading && (
             <div className="py-20 text-center text-xs text-[#a3a3a3] font-mono">
               <i className="fa-solid fa-spinner fa-spin text-2xl text-[#D81B60] block mb-3" />
-              Calculando métricas y cargando transacciones desde SQL Server...
+              <p>Calculando métricas y cargando transacciones desde SQL Server...</p>
             </div>
           )}
           {!loading && transaccionesFiltradas.length === 0 && (

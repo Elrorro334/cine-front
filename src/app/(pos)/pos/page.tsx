@@ -274,7 +274,7 @@ export default function PosPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
               <i className="fa-solid fa-cash-register text-[#D81B60]" />
-              Xilotzin POS
+              <span>Xilotzin POS</span>
             </h1>
             <span className="text-[10px] font-bold text-[#a3a3a3] font-mono bg-[#050505] px-2 py-0.5 rounded border border-[#262626]">
               {reloj}
@@ -387,7 +387,7 @@ export default function PosPage() {
                   {loadingCartelera && (
                     <div className="col-span-full py-16 text-center text-xs text-[#a3a3a3] font-mono">
                       <i className="fa-solid fa-spinner fa-spin text-xl text-[#D81B60] block mb-2" />
-                      Cargando cartelera desde base de datos...
+                      <p>Cargando cartelera desde base de datos...</p>
                     </div>
                   )}
                   {!loadingCartelera && cartelera.length === 0 && (
@@ -457,7 +457,7 @@ export default function PosPage() {
                 {loadingDulceria ? (
                   <div className="py-16 text-center text-xs text-[#a3a3a3] font-mono">
                     <i className="fa-solid fa-spinner fa-spin text-xl text-[#F57C00] block mb-2" />
-                    Consultando inventario en tiempo real...
+                    <p>Consultando inventario en tiempo real...</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -575,7 +575,7 @@ export default function PosPage() {
               <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
                 <h2 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-1.5">
                   <i className="fa-solid fa-cart-shopping text-[#D81B60]" />
-                  Resumen de Venta
+                  <span>Resumen de Venta</span>
                 </h2>
                 {carrito.length > 0 && (
                   <button

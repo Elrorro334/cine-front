@@ -1,6 +1,21 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5203/api';
 
 /**
+ * Clase de error estructurada para peticiones a la API
+ */
+export class ApiError extends Error {
+  status: number;
+  data?: unknown;
+
+  constructor(status: number, message: string, data?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+  }
+}
+
+/**
  * Petición HTTP genérica con inyección de JWT
  */
 export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -27,12 +42,7 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    // Retornamos el objeto de error retornado por la API si existe
-    throw {
-      status: response.status,
-      message: data.message || `Error HTTP: ${response.status}`,
-      data,
-    };
+    throw new ApiError(response.status, data.message || `Error HTTP: ${response.status}`, data);
   }
 
   return data as T;
@@ -58,10 +68,7 @@ export async function apiDownload(endpoint: string, options: RequestInit = {}): 
   });
 
   if (!response.ok) {
-    throw {
-      status: response.status,
-      message: `Error al descargar archivo: ${response.status}`,
-    };
+    throw new ApiError(response.status, `Error al descargar archivo: ${response.status}`);
   }
 
   return response.blob();
