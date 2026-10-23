@@ -1,3 +1,10 @@
+export interface ShowtimeDetail {
+  idFuncion: number;
+  hora: string;
+  nombreSala: string;
+  precio: number;
+}
+
 export interface Movie {
   id: number;
   title: string;
@@ -15,6 +22,7 @@ export interface Movie {
   actors?: string;
   trailerKey?: string | null;
   showtimes: string[];
+  funciones?: ShowtimeDetail[];
 }
 
 export interface Promotion {

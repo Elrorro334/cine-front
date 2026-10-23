@@ -1,14 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { taquillaService } from '@/services/taquillaService';
+import { ButacaDto } from '@/types/api';
 
 interface SeatMapModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  peliculaTitle: string;
-  horario: string;
-  precioBoleto?: number;
-  onConfirmSeats: (asientos: string[]) => void;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly peliculaTitle: string;
+  readonly horario: string;
+  readonly idFuncion?: number;
+  readonly precioBoleto?: number;
+  readonly onConfirmSeats: (asientos: string[]) => void;
+}
+
+function getSeatButtonStyle(isOcupado: boolean, isSelected: boolean): string {
+  if (isOcupado) {
+    return 'bg-red-950/40 text-red-700 border border-red-900/40 cursor-not-allowed opacity-50';
+  }
+  if (isSelected) {
+    return 'bg-[#D81B60] text-white border border-pink-400 scale-105 shadow-[0_0_10px_rgba(216,27,96,0.8)]';
+  }
+  return 'bg-[#050505] text-[#a3a3a3] hover:text-white border border-[#262626] hover:border-[#D81B60]';
 }
 
 export default function SeatMapModal({
@@ -16,47 +29,70 @@ export default function SeatMapModal({
   onClose,
   peliculaTitle,
   horario,
+  idFuncion,
   precioBoleto = 50,
   onConfirmSeats,
 }: SeatMapModalProps) {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
-  // Simulación de asientos ocupados (En el Sprint 2 se conectará al endpoint de Estado_Butacas_Funcion)
-  const [occupiedSeats] = useState<string[]>(['A3', 'A4', 'C5', 'D2']);
+  const [butacas, setButacas] = useState<ButacaDto[]>([]);
+  const [nombreSala, setNombreSala] = useState<string>('Sala 1');
+  const [precioReal, setPrecioReal] = useState<number>(precioBoleto);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  if (isOpen !== prevIsOpen) {
-    setPrevIsOpen(isOpen);
-    if (isOpen) {
-      setSelectedSeats([]);
+  useEffect(() => {
+    if (!isOpen || !idFuncion) return;
+
+    let isMounted = true;
+    setSelectedSeats([]);
+    setLoading(true);
+
+    async function loadButacas() {
+      try {
+        const data = await taquillaService.getButacasFuncion(idFuncion!);
+        if (isMounted) {
+          setButacas(data.butacas || []);
+          setNombreSala(data.nombreSala || 'Sala 1');
+          setPrecioReal(data.precio || precioBoleto);
+        }
+      } catch (err) {
+        console.error('Error cargando butacas:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     }
-  }
+
+    void loadButacas();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, idFuncion, precioBoleto]);
 
   if (!isOpen) return null;
 
-  const toggleAsiento = (asientoId: string) => {
-    if (occupiedSeats.includes(asientoId)) return;
+  // Filas únicas derivadas directamente de la base de datos
+  const filas = Array.from(new Set(butacas.map((b) => b.fila))).sort((a, b) => a.localeCompare(b));
 
-    if (selectedSeats.includes(asientoId)) {
-      setSelectedSeats(selectedSeats.filter((a) => a !== asientoId));
+  const toggleAsiento = (asientoCodigo: string, estaOcupada: boolean) => {
+    if (estaOcupada) return;
+
+    if (selectedSeats.includes(asientoCodigo)) {
+      setSelectedSeats(selectedSeats.filter((a) => a !== asientoCodigo));
     } else {
       if (selectedSeats.length >= 8) {
         alert('Máximo 8 boletos por selección.');
         return;
       }
-      setSelectedSeats([...selectedSeats, asientoId]);
+      setSelectedSeats([...selectedSeats, asientoCodigo]);
     }
   };
 
   const autoAsignar = () => {
-    const filas = ['A', 'B', 'C', 'D', 'E', 'F'];
-    for (const fila of filas) {
-      for (let num = 1; num <= 8; num++) {
-        const id = `${fila}${num}`;
-        if (!occupiedSeats.includes(id)) {
-          setSelectedSeats([id]);
-          return;
-        }
-      }
+    const primeraLibre = butacas.find((b) => !b.estaOcupada && !selectedSeats.includes(b.codigo));
+    if (primeraLibre) {
+      setSelectedSeats([primeraLibre.codigo]);
     }
   };
 
@@ -78,11 +114,11 @@ export default function SeatMapModal({
                 {peliculaTitle}
               </h3>
               <p className="text-[10px] text-[#a3a3a3] font-mono">
-                Sala 1 (48 Butacas) • Función {horario.substring(0, 5)}
+                {nombreSala} ({butacas.length} Butacas) • Función {horario.substring(0, 5)}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="text-[#a3a3a3] hover:text-white">
+          <button type="button" onClick={onClose} aria-label="Cerrar selector de butacas" className="text-[#a3a3a3] hover:text-white">
             <i className="fa-solid fa-xmark text-lg" />
           </button>
         </div>
@@ -91,7 +127,7 @@ export default function SeatMapModal({
         <div className="my-4 text-center">
           <div className="w-3/4 mx-auto h-2 bg-gradient-to-r from-transparent via-[#D81B60] to-transparent rounded-full shadow-[0_0_15px_rgba(216,27,96,0.8)] mb-1" />
           <span className="text-[9px] uppercase font-mono font-bold tracking-[0.25em] text-[#a3a3a3]">
-            PANTALLA SALA 1 (CURVED SCREEN)
+            PANTALLA {nombreSala.toUpperCase()} (CURVED SCREEN)
           </span>
         </div>
 
@@ -111,40 +147,44 @@ export default function SeatMapModal({
           </div>
         </div>
 
-        {/* Matriz 48 Asientos (A1 - F8) */}
-        <div className="bg-[#050505] p-3 rounded-2xl border border-[#262626] flex flex-col gap-2 items-center">
-          {['A', 'B', 'C', 'D', 'E', 'F'].map((fila) => (
-            <div key={fila} className="flex items-center gap-1.5">
-              <span className="w-4 text-center font-mono font-bold text-xs text-[#a3a3a3]">
-                {fila}
-              </span>
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => {
-                  const id = `${fila}${num}`;
-                  const isOcupado = occupiedSeats.includes(id);
-                  const isSelected = selectedSeats.includes(id);
+        {/* Matriz Dinámica desde Base de Datos */}
+        {loading ? (
+          <div className="py-12 text-center text-xs text-[#a3a3a3] font-mono">
+            <i className="fa-solid fa-spinner fa-spin text-lg text-[#D81B60] block mb-2" />
+            <p>Consultando disponibilidad en tiempo real...</p>
+          </div>
+        ) : (
+          <div className="bg-[#050505] p-3 rounded-2xl border border-[#262626] flex flex-col gap-2 items-center">
+            {filas.map((fila) => {
+              const butacasFila = butacas.filter((b) => b.fila === fila).sort((a, b) => a.numero - b.numero);
+              return (
+                <div key={fila} className="flex items-center gap-1.5">
+                  <span className="w-4 text-center font-mono font-bold text-xs text-[#a3a3a3]">
+                    {fila}
+                  </span>
+                  <div className="flex gap-1">
+                    {butacasFila.map((b) => {
+                      const isOcupado = b.estaOcupada;
+                      const isSelected = selectedSeats.includes(b.codigo);
 
-                  return (
-                    <button
-                      key={id}
-                      disabled={isOcupado}
-                      onClick={() => toggleAsiento(id)}
-                      className={`w-6 h-6 rounded font-mono text-[9px] font-bold transition-all ${
-                        isOcupado
-                          ? 'bg-red-950/40 text-red-700 border border-red-900/40 cursor-not-allowed opacity-50'
-                          : isSelected
-                          ? 'bg-[#D81B60] text-white border border-pink-400 scale-105 shadow-[0_0_10px_rgba(216,27,96,0.8)]'
-                          : 'bg-[#050505] text-[#a3a3a3] hover:text-white border border-[#262626] hover:border-[#D81B60]'
-                      }`}
-                    >
-                      {num}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+                      return (
+                        <button
+                          key={b.codigo}
+                          type="button"
+                          disabled={isOcupado}
+                          onClick={() => toggleAsiento(b.codigo, isOcupado)}
+                          className={`w-6 h-6 rounded font-mono text-[9px] font-bold transition-all ${getSeatButtonStyle(isOcupado, isSelected)}`}
+                        >
+                          {b.numero}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Subtotal y Botones */}
         <div className="mt-4 pt-3 border-t border-[#262626] flex flex-col gap-3">
@@ -157,7 +197,7 @@ export default function SeatMapModal({
           <div className="flex justify-between items-center text-xs">
             <span className="text-[#a3a3a3] font-bold uppercase">Subtotal Boletos:</span>
             <span className="font-mono font-black text-white text-sm">
-              ${selectedSeats.length * precioBoleto}.00
+              ${selectedSeats.length * precioReal}.00
             </span>
           </div>
 
@@ -167,7 +207,8 @@ export default function SeatMapModal({
               onClick={autoAsignar}
               className="bg-[#050505] hover:bg-neutral-800 text-[#a3a3a3] hover:text-white border border-[#262626] py-2.5 px-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
             >
-              <i className="fa-solid fa-bolt text-yellow-400 text-xs" /> Asignar Auto (1)
+              <i className="fa-solid fa-bolt text-yellow-400 text-xs" />
+              <span>Asignar Auto (1)</span>
             </button>
             <button
               type="button"
@@ -175,7 +216,8 @@ export default function SeatMapModal({
               onClick={handleConfirm}
               className="bg-[#D81B60] hover:bg-pink-600 disabled:opacity-40 text-white py-2.5 px-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5"
             >
-              <i className="fa-solid fa-check text-xs" /> Agregar a Venta
+              <i className="fa-solid fa-check text-xs" />
+              <span>Agregar a Venta</span>
             </button>
           </div>
         </div>

@@ -168,7 +168,7 @@ export default function TmdbRegisterModal({
         <div className="px-5 py-4 border-b border-[#262626] flex items-center justify-between bg-[#161616]">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#E11D2F] to-[#800C16] flex items-center justify-center text-white shadow-md">
-              <span className="text-sm">🎬</span>
+              <i className="fa-solid fa-film text-sm text-white" />
             </div>
             <div>
               <h2 className="text-base font-black uppercase text-white tracking-wide">
@@ -184,7 +184,7 @@ export default function TmdbRegisterModal({
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-[#262626] text-[#a3a3a3] hover:text-white hover:bg-[#333] transition flex items-center justify-center text-sm"
           >
-            ✕
+            <i className="fa-solid fa-xmark text-sm" />
           </button>
         </div>
 
@@ -211,14 +211,14 @@ export default function TmdbRegisterModal({
 
           {feedback && (
             <div className="mt-3 bg-emerald-950/60 border border-emerald-600/40 text-emerald-300 text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-2">
-              <span>✓</span>
+              <i className="fa-solid fa-circle-check text-emerald-400" />
               <span>{feedback}</span>
             </div>
           )}
 
           {error && (
             <div className="mt-3 bg-red-950/60 border border-red-600/40 text-red-300 text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-2">
-              <span>⚠️</span>
+              <i className="fa-solid fa-triangle-exclamation text-red-400" />
               <span>{error}</span>
             </div>
           )}
@@ -265,10 +265,10 @@ export default function TmdbRegisterModal({
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2 text-[11px] text-neutral-300 font-mono">
-                    <span className="bg-[#262626] px-2 py-0.5 rounded">⏱ {selectedMovieDetail.duracion} min</span>
-                    <span className="bg-[#262626] px-2 py-0.5 rounded">📅 {selectedMovieDetail.releaseYear}</span>
-                    <span className="bg-[#262626] px-2 py-0.5 rounded">★ {selectedMovieDetail.rating}/10</span>
-                    <span className="bg-[#262626] px-2 py-0.5 rounded">🎭 {selectedMovieDetail.genero}</span>
+                    <span className="bg-[#262626] px-2 py-0.5 rounded inline-flex items-center gap-1"><i className="fa-solid fa-clock text-[#E11D2F]" /> {selectedMovieDetail.duracion} min</span>
+                    <span className="bg-[#262626] px-2 py-0.5 rounded inline-flex items-center gap-1"><i className="fa-solid fa-calendar text-[#E11D2F]" /> {selectedMovieDetail.releaseYear}</span>
+                    <span className="bg-[#262626] px-2 py-0.5 rounded inline-flex items-center gap-1"><i className="fa-solid fa-star text-yellow-400" /> {selectedMovieDetail.rating}/10</span>
+                    <span className="bg-[#262626] px-2 py-0.5 rounded inline-flex items-center gap-1"><i className="fa-solid fa-masks-theater text-[#E11D2F]" /> {selectedMovieDetail.genero}</span>
                   </div>
                   <p className="text-neutral-300 leading-relaxed pt-2 line-clamp-3">
                     {selectedMovieDetail.sinopsis || 'Sin sinopsis disponible.'}
@@ -375,8 +375,8 @@ export default function TmdbRegisterModal({
                           loading="lazy"
                         />
                         {movie.rating > 0 && (
-                          <span className="absolute top-1 right-1 bg-black/75 backdrop-blur-md px-1.5 py-0.5 rounded text-[10px] font-bold text-amber-400">
-                            ★ {movie.rating}
+                          <span className="absolute top-1 right-1 bg-black/75 backdrop-blur-md px-1.5 py-0.5 rounded text-[10px] font-bold text-amber-400 flex items-center gap-1">
+                            <i className="fa-solid fa-star text-[9px] text-yellow-400" /> {movie.rating}
                           </span>
                         )}
                       </div>

@@ -71,13 +71,13 @@ export default function PublicFooter() {
             </h3>
             <ul className="flex flex-col gap-4 text-xs font-sans text-[#a3a3a3] font-medium">
               <li className="flex items-start gap-3">
-                <span className="text-[#E11D2F] font-bold">📍</span>
+                <i className="fa-solid fa-location-dot text-[#E11D2F] text-sm shrink-0" />
                 <span className="leading-relaxed">
                   Centro de Jilotepec<br />Estado de México, C.P. 54240
                 </span>
               </li>
               <li className="flex items-center gap-3">
-                <span className="text-[#E11D2F] font-bold">📞</span>
+                <i className="fa-solid fa-phone text-[#E11D2F] text-sm shrink-0" />
                 <span>Atención: +52 (55) 1234 5678</span>
               </li>
             </ul>
@@ -129,7 +129,7 @@ export default function PublicFooter() {
             &copy; 2026 Cine Teatro Xilotzin. Desarrollado por Rodnix.
           </p>
           <p className="text-[#a3a3a3]/50 text-[9px] font-sans font-bold uppercase tracking-[0.3em] flex items-center gap-1.5">
-            Hecho con <span className="text-[#E11D2F]">♥</span> en Jilotepec, Edo. Méx.
+            Hecho con <i className="fa-solid fa-heart text-[#E11D2F] mx-1" /> en Jilotepec, Edo. Méx.
           </p>
         </div>
       </div>

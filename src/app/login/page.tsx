@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/authService';
 
-const DEMO_EXTERNAL_IP = '187.190.22.40';
-
 export default function LoginPage() {
   const router = useRouter();
 
@@ -36,7 +34,7 @@ export default function LoginPage() {
         if (isMounted) {
           const error = err as { data?: { ipDetected?: string }; message?: string };
           setIsAllowedIp(false);
-          setDetectedIp(error?.data?.ipDetected || DEMO_EXTERNAL_IP);
+          setDetectedIp(error?.data?.ipDetected || 'No detectada');
           setNetworkMessage(error?.message || 'BLOQUEO POR RESTRICCIÓN DE RED (IP EXTERNA)');
         }
       } finally {
@@ -100,26 +98,6 @@ export default function LoginPage() {
     }
   };
 
-  const cargarPreset = (tipo: 'admin' | 'vendedor_ok' | 'vendedor_bloqueo') => {
-    setLoginError(null);
-    if (tipo === 'admin') {
-      setNombreUsuario('admin');
-      setPassword('admin123');
-    } else if (tipo === 'vendedor_ok') {
-      setIsAllowedIp(true);
-      setDetectedIp('192.168.1.105');
-      setNetworkMessage('Red Autorizada (Red Local del Cine)');
-      setNombreUsuario('Raul');
-      setPassword('123456');
-    } else {
-      setIsAllowedIp(false);
-      setDetectedIp(DEMO_EXTERNAL_IP);
-      setNetworkMessage('Bloqueo por IP externa asignada.');
-      setNombreUsuario('Raul');
-      setPassword('123456');
-    }
-  };
-
   const getDotClassName = () => {
     if (checkingNetwork) return 'bg-amber-500 animate-pulse';
     if (isAllowedIp) return 'bg-green-500 animate-pulse';
@@ -176,7 +154,7 @@ export default function LoginPage() {
                   type="text"
                   value={nombreUsuario}
                   onChange={(e) => setNombreUsuario(e.target.value)}
-                  placeholder="admin o vendedor"
+                  placeholder="Nombre de usuario"
                   disabled={isLoggingIn}
                   className="w-full bg-[#050505] text-white px-4 py-3 text-sm rounded-xl border border-[#262626] focus:outline-none focus:border-[#D81B60]"
                 />
@@ -209,14 +187,6 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
-
-            <div className="mt-6 pt-5 border-t border-[#262626]">
-              <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={() => cargarPreset('admin')} className="bg-[#050505] text-white text-[10px] font-bold py-2 rounded-xl border border-[#262626]">Admin</button>
-                <button type="button" onClick={() => cargarPreset('vendedor_ok')} className="bg-[#050505] text-green-400 text-[10px] font-bold py-2 rounded-xl border border-[#262626]">Vendedor OK</button>
-                <button type="button" onClick={() => cargarPreset('vendedor_bloqueo')} className="bg-[#050505] text-red-400 text-[10px] font-bold py-2 rounded-xl border border-[#262626]">Bloqueo IP</button>
-              </div>
-            </div>
           </div>
         </div>
       </main>

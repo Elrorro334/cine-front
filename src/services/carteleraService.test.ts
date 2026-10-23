@@ -5,10 +5,34 @@ describe('carteleraService', () => {
     jest.clearAllMocks();
   });
 
-  test('getPromociones retorna la lista de promociones iniciales', () => {
-    const promociones = carteleraService.getPromociones();
+  test('getPromociones retorna la lista de promociones desde la API de .NET', async () => {
+    const mockPromociones = [
+      {
+        id: 1,
+        titulo: 'Miércoles 2x1 en Boletos de Taquilla',
+        tag: 'Promoción Tradicional',
+        descripcion: 'Todos los miércoles vive el séptimo arte al doble.',
+        fecha: 'Todos los miércoles',
+        bg: 'from-amber-950/80 via-black to-neutral-950',
+        icono: 'fa-ticket',
+      },
+    ];
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockPromociones,
+    });
+
+    const promociones = await carteleraService.getPromociones();
     expect(promociones.length).toBeGreaterThan(0);
     expect(promociones[0].title).toContain('Miércoles 2x1');
+    expect(promociones[0].icon).toBe('fa-ticket');
+  });
+
+  test('getPromociones retorna arreglo vacío si la API falla', async () => {
+    global.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error'));
+    const promociones = await carteleraService.getPromociones();
+    expect(promociones).toEqual([]);
   });
 
   test('getCarteleraHoy retorna películas desde la API de .NET si responde exitosamente', async () => {
@@ -22,8 +46,8 @@ describe('carteleraService', () => {
         director: 'Director Famoso',
         poster_image: 'https://images.unsplash.com/photo-test.jpg',
         funciones: [
-          { idFuncion: 1, hora: '16:00', nombreSala: 'Sala 1' },
-          { idFuncion: 2, hora: '19:00', nombreSala: 'Sala 1' },
+          { idFuncion: 1, hora: '2026-10-21 16:00:00', nombreSala: 'Sala 1', precio: 50 },
+          { idFuncion: 2, hora: '2026-10-21T19:00:00', nombreSala: 'Sala 1', precio: 50 },
         ],
       },
     ];
@@ -71,12 +95,11 @@ describe('carteleraService', () => {
     );
   });
 
-  test('getCarteleraHoy retorna el catálogo de respaldo si la API falla o está vacía', async () => {
+  test('getCarteleraHoy retorna arreglo vacío si la API falla o está vacía', async () => {
     global.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error'));
 
     const movies = await carteleraService.getCarteleraHoy();
-    expect(movies).toHaveLength(8);
-    expect(movies[0].title).toBe('Spider-Man: Un Nuevo Día');
+    expect(movies).toEqual([]);
   });
 
   test('buscarTmdb retorna lista de resultados desde el backend de .NET', async () => {
@@ -110,6 +133,27 @@ describe('carteleraService', () => {
     expect(results).toEqual([]);
   });
 
+  test('obtenerDetalleTmdb obtiene el detalle completo desde el backend', async () => {
+    const mockDetalle = {
+      tmdbId: 155,
+      titulo: 'The Dark Knight',
+      sinopsis: 'Batman',
+      duracion: 152,
+      clasificacion: 'B',
+      director: 'Christopher Nolan',
+      posterPath: '/dark.jpg',
+    };
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockDetalle,
+    });
+
+    const detail = await carteleraService.obtenerDetalleTmdb(155);
+    expect(detail.tmdbId).toBe(155);
+    expect(detail.director).toBe('Christopher Nolan');
+  });
+
   test('registrarPelicula envía POST con el DTO al endpoint de .NET', async () => {
     const mockCreated = {
       idPelicula: 50,
@@ -139,5 +183,25 @@ describe('carteleraService', () => {
       })
     );
   });
-});
 
+  test('sincronizarCatalogoBase envía POST al endpoint de sincronización', async () => {
+    const mockCatalog = [{ idPelicula: 1, titulo: 'Spiderman', poster_image: '/spidey.jpg', funciones: [] }];
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockCatalog,
+    });
+
+    const result = await carteleraService.sincronizarCatalogoBase();
+    expect(result).toHaveLength(1);
+  });
+
+  test('eliminarPelicula envía DELETE y retorna boolean', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, message: 'Eliminada' }),
+    });
+
+    const ok = await carteleraService.eliminarPelicula(50);
+    expect(ok).toBe(true);
+  });
+});

@@ -52,7 +52,7 @@ export default function PromotionsBanner({ promotions }: PromotionsBannerProps) 
 
           <div className="flex items-center gap-4 pt-2 text-[11px] font-mono text-[#a3a3a3]">
             <span className="inline-flex items-center gap-1.5 text-amber-400 font-bold">
-              ★ {currentPromo.validity}
+              <i className="fa-solid fa-star text-xs mr-1" /> {currentPromo.validity}
             </span>
             <span>•</span>
             <span>Cine Teatro Xilotzin</span>
