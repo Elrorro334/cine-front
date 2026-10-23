@@ -9,7 +9,7 @@ jest.mock('@/services/dashboardService', () => ({
   },
 }));
 
-describe('FinancialDashboardView Component (HU-10)', () => {
+describe('FinancialDashboardView Component', () => {
   const mockDashboardData = {
     periodo: {
       fechaInicio: '2026-10-15',

@@ -112,7 +112,7 @@ export default function FinancialDashboardView() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/70 border border-emerald-800 text-emerald-400 text-[10px] font-bold uppercase tracking-wider mb-2">
               <i className="fa-solid fa-chart-pie" />
-              <span>Módulo Administrativo • HU-10</span>
+              <span>Módulo Administrativo • Finanzas</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-serif font-black uppercase text-white tracking-wide flex items-center gap-2.5">
               <i className="fa-solid fa-file-invoice-dollar text-[#D81B60]" />

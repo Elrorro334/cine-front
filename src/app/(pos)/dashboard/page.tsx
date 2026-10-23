@@ -13,7 +13,7 @@ export default function DashboardPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userName, setUserName] = useState<string>('Administrador');
 
-  // 1. Verificación de sesión y restricción estricta de Administrador (HU-10 Regla 1)
+  // 1. Verificación de sesión y restricción estricta de Administrador 
   useEffect(() => {
     const session = authService.getUserSession();
     if (!session) {
@@ -82,7 +82,7 @@ export default function DashboardPage() {
 
         {/* Navegación de Módulos Administrativos */}
         <nav className="flex-grow p-4 flex flex-col gap-2 mt-2 overflow-y-auto">
-          {/* HU-10: Dashboard Financiero y Cortes */}
+          {/* Dashboard Financiero y Cortes */}
           <button
             type="button"
             onClick={() => {
@@ -96,7 +96,7 @@ export default function DashboardPage() {
             }`}
           >
             <i className="fa-solid fa-chart-line text-sm" />
-            <span>Finanzas & Cortes (HU-10)</span>
+            <span>Finanzas & Cortes</span>
           </button>
 
           {/* Módulo de Películas y Cartelera TMDB */}
@@ -173,7 +173,7 @@ export default function DashboardPage() {
                 {activeTab === 'finanzas' ? 'Módulo Administrativo • Dashboard Financiero' : 'Módulo de Cartelera • Sincronización TMDB'}
               </span>
               <span className="hidden sm:inline-block text-[10px] bg-[#1a1a1a] text-[#a3a3a3] border border-[#333] px-2 py-0.5 rounded font-mono">
-                {activeTab === 'finanzas' ? 'HU-10' : 'Catálogo'}
+                {activeTab === 'finanzas' ? 'Finanzas' : 'Catálogo'}
               </span>
             </div>
           </div>
