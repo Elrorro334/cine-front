@@ -41,7 +41,7 @@ function PreordenForm() {
   // Selección del cliente
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
   const [selectedHorario, setSelectedHorario] = useState<string | null>(null);
-  const [boletos, setBoletos] = useState<number>(2);
+  const [boletos, setBoletos] = useState<number>(1);
   const [combosSeleccionados, setCombosSeleccionados] = useState<Record<number, number>>({});
 
   // Datos del cliente
@@ -266,13 +266,25 @@ function PreordenForm() {
   };
 
   const handlePrintPdf = () => {
+    if (typeof window === 'undefined') return;
+    const prevTitle = document.title;
+    if (activeTicket) {
+      document.title = `Ticket_${activeTicket.codigo}_Xilotzin`;
+    }
     window.print();
+    if (activeTicket) {
+      document.title = prevTitle;
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-['Montserrat',sans-serif] flex flex-col antialiased selection:bg-[#E11D2F] selection:text-white relative">
-      <CinemaAmbientParticles />
-      <PublicNavbar />
+    <div className={`min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-['Montserrat',sans-serif] flex flex-col antialiased selection:bg-[#E11D2F] selection:text-white relative ${isTicketModalOpen ? 'modal-ticket-active' : ''}`}>
+      <div className="no-print">
+        <CinemaAmbientParticles />
+      </div>
+      <div className="no-print">
+        <PublicNavbar />
+      </div>
 
       <main className="flex-grow max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12 w-full relative z-20">
         {/* Cabecera y Selector de Pestañas (Idéntico a Xilotzin/preorden.html) */}
@@ -832,38 +844,48 @@ function PreordenForm() {
             type="button"
             aria-label="Cerrar modal"
             onClick={() => setIsTicketModalOpen(false)}
-            className="fixed inset-0 bg-transparent cursor-default w-full h-full border-none p-0 -z-10 focus:outline-none"
+            className="fixed inset-0 bg-transparent cursor-default w-full h-full border-none p-0 -z-10 focus:outline-none no-print"
           />
 
-          <div className="bg-[#121212] border-2 border-[#E11D2F] rounded-3xl max-w-md w-full max-h-[92vh] overflow-y-auto relative shadow-2xl p-5 sm:p-7 text-center printable-ticket">
+          <div className="bg-[#121212] border-2 border-[#E11D2F] rounded-3xl max-w-md w-full max-h-[92vh] overflow-y-auto relative shadow-2xl p-5 sm:p-6 text-center printable-ticket">
+            {/* Encabezado Corporativo para Impresión en PDF (1 sola hoja) */}
+            <div className="hidden print:block border-b-2 border-dashed border-black pb-2 mb-2 text-center">
+              <span className="text-xs font-black tracking-[0.25em] uppercase text-black block">
+                Cine Teatro Xilotzin
+              </span>
+              <span className="text-[10px] text-neutral-600 uppercase tracking-widest font-mono">
+                Comprobante Oficial de Pre-orden Digital
+              </span>
+            </div>
+
             {/* Botón Cerrar */}
             <button
               type="button"
               onClick={() => setIsTicketModalOpen(false)}
-              className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 w-8 h-8 rounded-full bg-[#0A0A0A] flex items-center justify-center text-white hover:bg-[#E11D2F] transition-colors border border-[#262626] text-sm no-print"
+              className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 w-8 h-8 rounded-full bg-[#0A0A0A] flex items-center justify-center text-white hover:bg-[#E11D2F] transition-colors border border-[#262626] text-sm no-print cursor-pointer"
               aria-label="Cerrar ticket"
             >
               <i className="fa-solid fa-xmark" />
             </button>
 
             {/* Check y Folio */}
-            <div className="flex flex-col items-center mb-4">
-              <div className="w-11 h-11 rounded-full bg-emerald-950/80 border border-emerald-500/50 flex items-center justify-center text-emerald-400 mb-2">
-                <i className="fa-solid fa-check text-lg" />
+            <div className="flex flex-col items-center mb-3">
+              <div className="w-10 h-10 rounded-full bg-emerald-950/80 border border-emerald-500/50 flex items-center justify-center text-emerald-400 mb-1.5 print:bg-emerald-50 print:text-emerald-700 print:border-emerald-600">
+                <i className="fa-solid fa-check text-base" />
               </div>
-              <span className="text-[11px] font-mono font-bold text-[#E11D2F] tracking-[0.25em] uppercase">
+              <span className="text-[11px] font-mono font-bold text-[#E11D2F] print:text-red-700 tracking-[0.25em] uppercase">
                 {activeTicket.codigo}
               </span>
-              <h2 className="text-xl sm:text-2xl font-['Playfair_Display',serif] font-black uppercase text-white mt-1 leading-tight">
+              <h2 className="text-xl sm:text-2xl font-['Playfair_Display',serif] font-black uppercase text-white print:text-black mt-1 leading-tight">
                 {activeTicket.pelicula}
               </h2>
-              <p className="text-[11px] sm:text-xs text-[#A0A0A0] font-sans mt-1">
+              <p className="text-[11px] sm:text-xs text-[#A0A0A0] print:text-neutral-700 font-sans mt-0.5">
                 Función: {activeTicket.horario} • {activeTicket.boletosGeneral} Boletos • Asignación en Taquilla
               </p>
             </div>
 
             {/* Código QR de Alta Definición */}
-            <div className="bg-white p-3 rounded-2xl w-48 h-48 sm:w-56 sm:h-56 mx-auto mb-4 shadow-2xl flex items-center justify-center border-4 border-black/10">
+            <div className="bg-white p-2 rounded-2xl w-44 h-44 sm:w-48 sm:h-48 mx-auto mb-3 shadow-2xl flex items-center justify-center border-4 border-black/10 print:border-2 print:border-black qr-box">
               {activeTicketQrUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -877,30 +899,30 @@ function PreordenForm() {
             </div>
 
             {/* Detalles de Vigencia y Folio */}
-            <div className="bg-[#0A0A0A] border border-[#262626] rounded-xl p-3 mb-4 text-xs font-mono space-y-1.5 text-left">
-              <div className="flex justify-between items-center text-[#A0A0A0]">
+            <div className="bg-[#0A0A0A] border border-[#262626] rounded-xl p-3 mb-3 text-xs font-mono space-y-1 text-left ticket-info-box">
+              <div className="flex justify-between items-center text-[#A0A0A0] print:text-neutral-800">
                 <span>Válido hasta:</span>
-                <span className="text-white font-bold">{formatShowtimeDate(12)}</span>
+                <span className="text-white print:text-black font-bold">{formatShowtimeDate(12)}</span>
               </div>
-              <div className="flex justify-between items-center text-[#A0A0A0]">
+              <div className="flex justify-between items-center text-[#A0A0A0] print:text-neutral-800">
                 <span>Total en Taquilla:</span>
-                <span className="text-[#DCA54C] font-black text-sm">${activeTicket.total} MXN</span>
+                <span className="text-[#DCA54C] print:text-black font-black text-sm">${activeTicket.total} MXN</span>
               </div>
-              <div className="flex justify-between items-center text-[#A0A0A0]">
+              <div className="flex justify-between items-center text-[#A0A0A0] print:text-neutral-800">
                 <span>Estado:</span>
-                <span className="text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded text-[10px]">
+                <span className="text-emerald-400 print:text-emerald-800 font-bold bg-emerald-950/60 print:bg-emerald-50 px-2 py-0.5 rounded text-[10px] print:border print:border-emerald-600">
                   VIGENTE ({activeTicket.vigenciaDias || 12} DÍAS)
                 </span>
               </div>
             </div>
 
             {/* Caja Informativa de Canje */}
-            <div className="bg-[#0A0A0A] border border-[#262626] rounded-xl p-3.5 mb-5 text-left flex items-start gap-2.5">
-              <div className="w-5 h-5 rounded-full bg-[#DCA54C] text-black font-bold flex items-center justify-center text-[11px] shrink-0 mt-0.5">
-                ?
+            <div className="bg-[#0A0A0A] border border-[#262626] rounded-xl p-2.5 mb-4 text-left flex items-start gap-2 ticket-help-box">
+              <div className="w-5 h-5 rounded-full bg-[#DCA54C] text-black font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5 print:bg-black print:text-white">
+                <i className="fa-solid fa-info" />
               </div>
-              <p className="text-[11px] text-[#A0A0A0] leading-relaxed">
-                <strong className="text-white">¿Cómo canjearlo?</strong> Llega a la taquilla física de Cine Xilotzin, muestra este código QR al cajero en tu pantalla y realiza el pago en efectivo o tarjeta para entrar a tu función.
+              <p className="text-[10px] sm:text-[11px] text-[#A0A0A0] print:text-neutral-700 leading-snug">
+                <strong className="text-white print:text-black">¿Cómo canjearlo?</strong> Presenta este código QR en la taquilla física de Cine Xilotzin (en tu móvil o impreso) y realiza el pago para entrar a tu función.
               </p>
             </div>
 
@@ -930,33 +952,117 @@ function PreordenForm() {
         </dialog>
       )}
 
-      {/* Estilos para Impresión limpia en PDF */}
+      {/* Estilos para Impresión limpia en EXACTAMENTE 1 sola hoja PDF */}
       <style jsx global>{`
         @media print {
+          @page {
+            size: portrait;
+            margin: 6mm 10mm;
+          }
+
+          html,
           body {
+            height: auto !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
             background: #ffffff !important;
             color: #000000 !important;
+            overflow: visible !important;
           }
-          header, footer, .no-print {
+
+          .min-h-screen {
+            min-height: 0 !important;
+            height: auto !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+
+          .no-print,
+          nav,
+          footer,
+          header,
+          main,
+          [aria-label="Cerrar modal"],
+          [aria-label="Cerrar ticket"] {
             display: none !important;
           }
+
+          dialog {
+            position: static !important;
+            display: block !important;
+            inset: auto !important;
+            width: 100% !important;
+            height: auto !important;
+            max-height: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+            overflow: visible !important;
+          }
+
           .printable-ticket {
+            display: block !important;
+            position: static !important;
             background: #ffffff !important;
             color: #000000 !important;
-            border: 2px solid #000000 !important;
+            border: 2px dashed #000000 !important;
+            border-radius: 12px !important;
             box-shadow: none !important;
-            max-width: 100% !important;
+            max-width: 380px !important;
             width: 100% !important;
             margin: 0 auto !important;
+            padding: 14px 18px !important;
+            max-height: none !important;
+            overflow: visible !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            page-break-before: avoid !important;
+            break-before: avoid !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
           }
-          .printable-ticket h2,
-          .printable-ticket span,
-          .printable-ticket p {
+
+          .printable-ticket * {
             color: #000000 !important;
+            text-shadow: none !important;
           }
-          .printable-ticket .bg-\[\#0A0A0A\] {
-            background: #f5f5f5 !important;
-            border-color: #cccccc !important;
+
+          .printable-ticket .qr-box {
+            width: 145px !important;
+            height: 145px !important;
+            margin: 6px auto !important;
+            padding: 4px !important;
+            border: 2px solid #000000 !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+            background: #ffffff !important;
+          }
+
+          .printable-ticket .qr-box img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+          }
+
+          .printable-ticket .ticket-info-box {
+            background: #f8f8f8 !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
+            padding: 8px 12px !important;
+            margin-bottom: 8px !important;
+          }
+
+          .printable-ticket .ticket-help-box {
+            background: #fdfdfd !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 8px !important;
+            padding: 8px 12px !important;
+            margin-bottom: 0 !important;
           }
         }
       `}</style>

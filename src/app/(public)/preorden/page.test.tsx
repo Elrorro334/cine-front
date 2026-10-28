@@ -111,13 +111,13 @@ describe('PreordenPage Component', () => {
     const masBtn = screen.getByRole('button', { name: /Sumar un boleto/i });
     fireEvent.click(masBtn);
 
-    // Boletos pasa de 2 a 3: 3 * 50 = $150 MXN
-    expect(screen.getAllByText('$150 MXN').length).toBeGreaterThanOrEqual(1);
+    // Boletos pasa de 1 a 2: 2 * 50 = $100 MXN
+    expect(screen.getAllByText('$100 MXN').length).toBeGreaterThanOrEqual(1);
 
     const menosBtn = screen.getByRole('button', { name: /Restar un boleto/i });
     fireEvent.click(menosBtn);
-    // Vuelve a 2: 2 * 50 = $100 MXN
-    expect(screen.getAllByText('$100 MXN').length).toBeGreaterThanOrEqual(1);
+    // Vuelve a 1: 1 * 50 = $50 MXN
+    expect(screen.getAllByText('$50 MXN').length).toBeGreaterThanOrEqual(1);
   });
 
   test('permite agregar combos y actualizar el subtotal', async () => {
@@ -129,8 +129,8 @@ describe('PreordenPage Component', () => {
     const agregarComboBtn = screen.getByRole('button', { name: /Agregar Combo Pareja Xilotzin/i });
     fireEvent.click(agregarComboBtn);
 
-    // 2 boletos ($100) + 1 combo ($110) = $210 MXN
-    expect(screen.getByText('$210 MXN')).toBeInTheDocument();
+    // 1 boleto ($50) + 1 combo ($110) = $160 MXN
+    expect(screen.getByText('$160 MXN')).toBeInTheDocument();
   });
 
   test('valida formato de teléfono (debe iniciar con 55 y tener 10 dígitos)', async () => {
