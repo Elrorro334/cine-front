@@ -13,17 +13,24 @@ interface MovieDetailModalProps {
 export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetailModalProps) {
   const router = useRouter();
   const [selectedHorarioOverride, setSelectedHorarioOverride] = useState<string | null>(null);
+  const [isTrailerOpen, setIsTrailerOpen] = useState(false);
+  const [activeTrailerQuery, setActiveTrailerQuery] = useState<string>('oficial');
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
+      setIsTrailerOpen(false);
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (isTrailerOpen) {
+          setIsTrailerOpen(false);
+        } else {
+          onClose();
+        }
       }
     };
 
@@ -32,7 +39,7 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
       document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isTrailerOpen]);
 
   if (!isOpen || !movie) return null;
 
@@ -44,25 +51,42 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
   const salaDisplay = selectedFuncion?.nombreSala || 'Sala Principal';
 
   const handleGenerarPreorden = () => {
+    setIsTrailerOpen(false);
     onClose();
     const horarioParam = selectedHorario ? `&horario=${encodeURIComponent(selectedHorario)}` : '';
     router.push(`/preorden?peli=${movie.id}${horarioParam}`);
   };
 
   const handleVerTrailer = () => {
-    const targetUrl = movie.trailerKey
-      ? `https://www.youtube.com/watch?v=${movie.trailerKey}`
-      : `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' trailer oficial')}`;
-    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    setActiveTrailerQuery('oficial');
+    setIsTrailerOpen(true);
+  };
+
+  const getTrailerEmbedUrl = () => {
+    if (activeTrailerQuery === 'oficial' && movie.trailerKey) {
+      return `https://www.youtube-nocookie.com/embed/${movie.trailerKey}?autoplay=1&rel=0`;
+    }
+    const querySuffix =
+      activeTrailerQuery === 'teaser'
+        ? 'teaser trailer oficial'
+        : activeTrailerQuery === 'trailer2'
+        ? 'trailer 2 oficial'
+        : activeTrailerQuery === 'makingof'
+        ? 'detras de camaras oficial'
+        : 'trailer oficial';
+    return `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(
+      `${movie.title} ${querySuffix}`
+    )}&autoplay=1`;
   };
 
   return (
-    <dialog
-      open
-      aria-modal="true"
-      aria-labelledby="movie-modal-title"
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#0A0A0A]/95 backdrop-blur-md transition-opacity duration-300 border-none m-0 max-w-none max-h-none w-full h-full"
-    >
+    <>
+      <dialog
+        open
+        aria-modal="true"
+        aria-labelledby="movie-modal-title"
+        className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#0A0A0A]/95 backdrop-blur-md transition-opacity duration-300 border-none m-0 max-w-none max-h-none w-full h-full"
+      >
       {/* Backdrop click to close */}
       <button
         type="button"
@@ -206,5 +230,126 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
         </div>
       </div>
     </dialog>
+
+    {/* ==========================================================
+         MODAL REPRODUCTOR DE TRÁILER INTEGRADO EN LA PÁGINA
+         ========================================================== */}
+    {isTrailerOpen && (
+      <dialog
+        open
+        aria-modal="true"
+        aria-labelledby="trailer-modal-title"
+        className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-5 bg-black/95 backdrop-blur-xl border-none m-0 max-w-none max-h-none w-full h-full"
+      >
+        {/* Backdrop click to close trailer */}
+        <button
+          type="button"
+          aria-label="Cerrar reproductor"
+          onClick={() => setIsTrailerOpen(false)}
+          className="fixed inset-0 bg-transparent cursor-default w-full h-full border-none p-0 -z-10 focus:outline-none"
+        />
+
+        <div className="bg-[#121212] border border-[#262626] rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-y-auto relative shadow-2xl flex flex-col p-4 sm:p-6 space-y-4">
+          {/* Cabecera del reproductor */}
+          <div className="flex items-center justify-between border-b border-[#262626] pb-3">
+            <div className="pr-4">
+              <span className="text-[10px] font-bold text-[#E11D2F] uppercase tracking-[0.25em] flex items-center gap-1.5 mb-1">
+                <i className="fa-solid fa-film text-xs" /> Sala Virtual Xilotzin
+              </span>
+              <h3
+                id="trailer-modal-title"
+                className="text-lg sm:text-2xl font-['Playfair_Display',serif] font-black uppercase text-white truncate"
+              >
+                Tráiler de {movie.title}
+              </h3>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsTrailerOpen(false)}
+              className="w-9 h-9 sm:w-10 sm:h-10 bg-[#0A0A0A] hover:bg-[#E11D2F] text-white rounded-full flex items-center justify-center transition-colors border border-[#262626] shrink-0 text-sm cursor-pointer shadow-md"
+              aria-label="Cerrar tráiler"
+            >
+              <i className="fa-solid fa-xmark text-base" />
+            </button>
+          </div>
+
+          {/* Contenedor del Video en Proporción 16:9 */}
+          <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-[#262626]">
+            <iframe
+              src={getTrailerEmbedUrl()}
+              title={`Tráiler de ${movie.title}`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              className="w-full h-full border-0 absolute inset-0"
+            />
+          </div>
+
+          {/* Selector de Tráilers y Material Adicional */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-sans font-bold uppercase tracking-wider text-[#A0A0A0] block">
+              Tráilers y Contenido Disponible:
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'oficial', label: 'Tráiler Oficial', icon: 'fa-play' },
+                { id: 'teaser', label: 'Teaser Tráiler', icon: 'fa-film' },
+                { id: 'trailer2', label: 'Tráiler 2', icon: 'fa-clapperboard' },
+                { id: 'makingof', label: 'Detrás de Cámaras', icon: 'fa-video' },
+              ].map((item) => {
+                const isActive = activeTrailerQuery === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveTrailerQuery(item.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold font-sans uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isActive
+                        ? 'bg-[#E11D2F] text-white shadow-md'
+                        : 'bg-[#0A0A0A] text-[#A0A0A0] hover:text-white border border-[#262626]'
+                    }`}
+                  >
+                    <i className={`fa-solid ${item.icon} text-[10px]`} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Pie del Reproductor con Acciones Rápidas */}
+          <div className="pt-3 border-t border-[#262626] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="text-xs text-[#A0A0A0] font-sans flex items-center gap-2">
+              <span className="bg-[#0A0A0A] px-2.5 py-1 rounded border border-[#262626] font-bold text-white uppercase text-[10px]">
+                {movie.duration}
+              </span>
+              <span className="bg-[#0A0A0A] px-2.5 py-1 rounded border border-[#262626] font-bold text-white uppercase text-[10px]">
+                Clasif. {movie.classification}
+              </span>
+              <span>Proyección en {salaDisplay}</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsTrailerOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-[#0A0A0A] hover:bg-[#1a1a1a] text-[#A0A0A0] hover:text-white text-xs font-bold uppercase tracking-wider border border-[#262626] transition-colors cursor-pointer"
+              >
+                Volver a Detalles
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerarPreorden}
+                className="px-5 py-2.5 rounded-xl bg-[#E11D2F] hover:bg-[#c81928] text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg hover:shadow-[#E11D2F]/40 cursor-pointer"
+              >
+                <i className="fa-solid fa-qrcode" />
+                <span>Generar Pre-Orden</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </dialog>
+    )}
+  </>
   );
 }
