@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Movie } from '@/types/cartelera';
 
 interface MovieDetailModalProps {
@@ -10,16 +11,12 @@ interface MovieDetailModalProps {
 }
 
 export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetailModalProps) {
-  const [selectedHorario, setSelectedHorario] = useState<string | null>(null);
+  const router = useRouter();
+  const [selectedHorarioOverride, setSelectedHorarioOverride] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      if (movie && movie.showtimes.length > 0) {
-        setSelectedHorario(movie.showtimes[0]);
-      } else {
-        setSelectedHorario(null);
-      }
     } else {
       document.body.style.overflow = 'unset';
     }
@@ -35,13 +32,29 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
       document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, movie, onClose]);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !movie) return null;
+
+  const defaultHorario = movie.showtimes.length > 0 ? movie.showtimes[0] : null;
+  const selectedHorario = selectedHorarioOverride ?? defaultHorario;
 
   const selectedFuncion = movie.funciones?.find((f) => f.hora === selectedHorario) ?? movie.funciones?.[0];
   const precioDisplay = selectedFuncion ? selectedFuncion.precio : 50;
   const salaDisplay = selectedFuncion?.nombreSala || 'Sala Principal';
+
+  const handleGenerarPreorden = () => {
+    onClose();
+    const horarioParam = selectedHorario ? `&horario=${encodeURIComponent(selectedHorario)}` : '';
+    router.push(`/preorden?peli=${movie.id}${horarioParam}`);
+  };
+
+  const handleVerTrailer = () => {
+    const targetUrl = movie.trailerKey
+      ? `https://www.youtube.com/watch?v=${movie.trailerKey}`
+      : `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' trailer oficial')}`;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <dialog
@@ -128,7 +141,7 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
                     <button
                       key={hora}
                       type="button"
-                      onClick={() => setSelectedHorario(hora)}
+                      onClick={() => setSelectedHorarioOverride(hora)}
                       className={`px-4 py-2 rounded-xl font-mono text-xs font-bold uppercase transition-all ${
                         isSelected
                           ? 'bg-[#E11D2F] text-white shadow-lg shadow-[#E11D2F]/30 scale-105'
@@ -171,14 +184,23 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
             </div>
           </div>
 
-          {/* Botón de Acción */}
-          <div className="mt-auto pt-4 border-t border-[#262626]">
+          {/* Botones de Acción (Captura 1: Generar Pre-Orden y Ver Tráiler) */}
+          <div className="mt-auto pt-4 border-t border-[#262626] flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <button
               type="button"
-              onClick={onClose}
-              className="w-full bg-gradient-to-r from-[#E11D2F] to-red-700 text-white px-5 py-3.5 rounded-xl font-sans font-black text-xs uppercase tracking-widest hover:scale-[1.02] hover:shadow-[0_0_25px_rgba(225,29,47,0.45)] transition-all flex items-center justify-center gap-2 text-center leading-tight shadow-lg"
+              onClick={handleGenerarPreorden}
+              className="flex-1 bg-[#E11D2F] hover:bg-[#c81928] text-white py-3.5 px-4 rounded-xl font-sans font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-[#E11D2F]/40 hover:scale-[1.01]"
             >
-              <span>Entendido • Regresar a Cartelera</span>
+              <i className="fa-solid fa-qrcode text-sm" />
+              <span>Generar Pre-Orden (Ticket QR)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleVerTrailer}
+              className="bg-[#161616] hover:bg-[#222222] border border-[#333333] hover:border-neutral-500 text-white py-3.5 px-5 rounded-xl font-sans font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+            >
+              <i className="fa-brands fa-youtube text-red-500 text-base" />
+              <span>Ver Tráiler</span>
             </button>
           </div>
         </div>

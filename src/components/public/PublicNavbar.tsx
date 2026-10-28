@@ -38,15 +38,15 @@ export default function PublicNavbar() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6 lg:gap-8 font-sans font-bold text-xs tracking-widest uppercase">
-            <a
-              href="#cartelera"
+            <Link
+              href="/"
               className="flex items-center gap-2 text-white hover:text-[#E11D2F] transition-colors"
             >
               <svg aria-hidden="true" className="w-4 h-4 text-[#E11D2F]" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z" />
               </svg>
               Cartelera
-            </a>
+            </Link>
             <a
               href="#promociones"
               className="flex items-center gap-2 text-[#a3a3a3] hover:text-white transition-colors"
@@ -56,17 +56,17 @@ export default function PublicNavbar() {
               </svg>
               Dulcería & Combos
             </a>
-            <a
-              href="#promociones"
+            <Link
+              href="/preorden"
               className="flex items-center gap-2 bg-[#E11D2F]/15 hover:bg-[#E11D2F] text-white px-3.5 py-1.5 rounded-lg border border-[#E11D2F]/40 transition-all shadow-md"
             >
               <svg aria-hidden="true" className="w-4 h-4 text-[#E11D2F]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
               </svg>
               Pre-orden QR
-            </a>
-            <a
-              href="#cartelera"
+            </Link>
+            <Link
+              href="/preorden?tab=tickets"
               className="flex items-center gap-2 text-[#a3a3a3] hover:text-white transition-colors"
               title="Mis Tickets y Compras"
             >
@@ -74,7 +74,7 @@ export default function PublicNavbar() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
               </svg>
               Mis Tickets
-            </a>
+            </Link>
           </nav>
 
           {/* Mobile menu button */}
@@ -100,13 +100,13 @@ export default function PublicNavbar() {
       {/* Mobile Menu Dropdown */}
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-[#262626] bg-[#0d0d0d] px-4 pt-3 pb-4 space-y-2 text-xs font-bold uppercase">
-          <a
-            href="#cartelera"
+          <Link
+            href="/"
             onClick={() => setIsMobileMenuOpen(false)}
             className="block py-2 text-white hover:text-[#E11D2F]"
           >
             Cartelera
-          </a>
+          </Link>
           <a
             href="#promociones"
             onClick={() => setIsMobileMenuOpen(false)}
@@ -114,20 +114,20 @@ export default function PublicNavbar() {
           >
             Dulcería & Combos
           </a>
-          <a
-            href="#promociones"
+          <Link
+            href="/preorden"
             onClick={() => setIsMobileMenuOpen(false)}
             className="block py-2 text-[#a3a3a3] hover:text-white"
           >
             Pre-orden QR
-          </a>
-          <a
-            href="#cartelera"
+          </Link>
+          <Link
+            href="/preorden?tab=tickets"
             onClick={() => setIsMobileMenuOpen(false)}
             className="block py-2 text-[#a3a3a3] hover:text-white"
           >
             Mis Tickets
-          </a>
+          </Link>
           <Link
             href="/login"
             onClick={() => setIsMobileMenuOpen(false)}

@@ -6,6 +6,8 @@ import {
   TmdbMovieDetailDto,
   RegistrarPeliculaDto,
   PromocionDto,
+  CrearPreordenDto,
+  PreordenDto,
 } from '@/types/api';
 import { Movie, Promotion } from '@/types/cartelera';
 
@@ -147,5 +149,22 @@ export const carteleraService = {
       { method: 'DELETE' }
     );
     return res.success;
+  },
+
+  /**
+   * Genera una pre-orden digital con código QR oficial en SQL Server
+   */
+  async crearPreorden(dto: CrearPreordenDto): Promise<PreordenDto> {
+    return apiFetch<PreordenDto>('/cartelera/preorden', {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  },
+
+  /**
+   * Consulta una pre-orden por su código QR
+   */
+  async obtenerPreorden(codigoQr: string): Promise<PreordenDto> {
+    return apiFetch<PreordenDto>(`/taquilla/preorden/${encodeURIComponent(codigoQr)}`);
   },
 };

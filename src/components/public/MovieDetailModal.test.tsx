@@ -2,6 +2,13 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import MovieDetailModal from './MovieDetailModal';
 import { Movie } from '@/types/cartelera';
 
+const mockPush = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
+
 const mockMovie: Movie = {
   id: 1,
   title: 'Resident Evil: Noche cero',
@@ -18,6 +25,7 @@ const mockMovie: Movie = {
   director: 'Director de prueba',
   actors: 'Actor 1, Actor 2',
   showtimes: ['11:30', '15:00'],
+  trailerKey: 'dQw4w9WgXcQ',
 };
 
 describe('MovieDetailModal Component', () => {
@@ -61,6 +69,31 @@ describe('MovieDetailModal Component', () => {
     fireEvent.click(horarioBtn);
 
     expect(screen.getByText(/Función seleccionada: 11:30 hrs/i)).toBeInTheDocument();
+  });
+
+  test('navega a /preorden al hacer clic en Generar Pre-Orden (Ticket QR)', () => {
+    render(<MovieDetailModal isOpen={true} movie={mockMovie} onClose={mockOnClose} />);
+
+    const preordenBtn = screen.getByRole('button', { name: /Generar Pre-Orden \(Ticket QR\)/i });
+    fireEvent.click(preordenBtn);
+
+    expect(mockOnClose).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('/preorden?peli=1'));
+  });
+
+  test('abre tráiler en ventana externa al hacer clic en Ver Tráiler', () => {
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    render(<MovieDetailModal isOpen={true} movie={mockMovie} onClose={mockOnClose} />);
+
+    const trailerBtn = screen.getByRole('button', { name: /Ver Tráiler/i });
+    fireEvent.click(trailerBtn);
+
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringContaining('youtube.com'),
+      '_blank',
+      'noopener,noreferrer'
+    );
+    openSpy.mockRestore();
   });
 
   test('llama a onClose al presionar el botón de cerrar y la tecla Escape', () => {

@@ -170,6 +170,19 @@ export interface PreordenDto {
 }
 
 // DTOs de Dashboard Financiero (HU-10)
+export interface CrearPreordenItemDulceriaDto {
+  idProducto: number;
+  cantidad: number;
+}
+
+export interface CrearPreordenDto {
+  idFuncion: number;
+  boletos: number;
+  nombreCliente: string;
+  telefonoCliente: string;
+  combos?: CrearPreordenItemDulceriaDto[];
+}
+
 export interface PeriodoDashboardDto {
   fechaInicio: string;
   fechaFin: string;
