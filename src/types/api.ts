@@ -231,3 +231,16 @@ export interface SemanaCinematograficaDto {
   fechaFin: string;
   descripcion: string;
 }
+
+export interface TrailerItemDto {
+  key: string;
+  nombre: string;
+  tipo: string;
+}
+
+export interface PeliculaTrailerDto {
+  idPelicula: number;
+  titulo: string;
+  trailerKey?: string | null;
+  trailers: TrailerItemDto[];
+}

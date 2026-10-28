@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Movie } from '@/types/cartelera';
+import { carteleraService } from '@/services/carteleraService';
+import { PeliculaTrailerDto } from '@/types/api';
 
 interface MovieDetailModalProps {
   readonly movie: Movie | null;
@@ -14,7 +16,9 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
   const router = useRouter();
   const [selectedHorarioOverride, setSelectedHorarioOverride] = useState<string | null>(null);
   const [isTrailerOpen, setIsTrailerOpen] = useState(false);
-  const [activeTrailerQuery, setActiveTrailerQuery] = useState<string>('oficial');
+  const [trailerData, setTrailerData] = useState<PeliculaTrailerDto | null>(null);
+  const [selectedTrailerKey, setSelectedTrailerKey] = useState<string | null>(null);
+  const [loadingTrailer, setLoadingTrailer] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -22,6 +26,8 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
     } else {
       document.body.style.overflow = 'unset';
       setIsTrailerOpen(false);
+      setTrailerData(null);
+      setSelectedTrailerKey(null);
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,26 +63,24 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
     router.push(`/preorden?peli=${movie.id}${horarioParam}`);
   };
 
-  const handleVerTrailer = () => {
-    setActiveTrailerQuery('oficial');
+  const handleVerTrailer = async () => {
     setIsTrailerOpen(true);
-  };
-
-  const getTrailerEmbedUrl = () => {
-    if (activeTrailerQuery === 'oficial' && movie.trailerKey) {
-      return `https://www.youtube-nocookie.com/embed/${movie.trailerKey}?autoplay=1&rel=0`;
+    setLoadingTrailer(true);
+    try {
+      const data = await carteleraService.obtenerTrailer(movie.id);
+      if (data && data.trailerKey) {
+        setTrailerData(data);
+        setSelectedTrailerKey(data.trailerKey);
+      } else if (movie.trailerKey) {
+        setSelectedTrailerKey(movie.trailerKey);
+      }
+    } catch {
+      if (movie.trailerKey) {
+        setSelectedTrailerKey(movie.trailerKey);
+      }
+    } finally {
+      setLoadingTrailer(false);
     }
-    const querySuffix =
-      activeTrailerQuery === 'teaser'
-        ? 'teaser trailer oficial'
-        : activeTrailerQuery === 'trailer2'
-        ? 'trailer 2 oficial'
-        : activeTrailerQuery === 'makingof'
-        ? 'detras de camaras oficial'
-        : 'trailer oficial';
-    return `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(
-      `${movie.title} ${querySuffix}`
-    )}&autoplay=1`;
   };
 
   return (
@@ -275,47 +279,59 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
           </div>
 
           {/* Contenedor del Video en Proporción 16:9 */}
-          <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-[#262626]">
-            <iframe
-              src={getTrailerEmbedUrl()}
-              title={`Tráiler de ${movie.title}`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              className="w-full h-full border-0 absolute inset-0"
-            />
+          <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-[#262626] flex items-center justify-center">
+            {loadingTrailer ? (
+              <div className="flex flex-col items-center justify-center text-white space-y-3 p-6 text-center">
+                <i className="fa-solid fa-spinner fa-spin text-2xl text-[#E11D2F]" />
+                <span className="text-xs uppercase font-mono tracking-widest text-[#A0A0A0]">
+                  Cargando tráiler oficial de {movie.title}...
+                </span>
+              </div>
+            ) : selectedTrailerKey ? (
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${selectedTrailerKey}?autoplay=1&rel=0&modestbranding=1`}
+                title={`Tráiler de ${movie.title}`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                className="w-full h-full border-0 absolute inset-0"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center text-white space-y-2 p-6 text-center">
+                <i className="fa-solid fa-triangle-exclamation text-2xl text-[#DCA54C]" />
+                <p className="text-sm font-bold">No hay tráiler disponible para esta función</p>
+                <p className="text-xs text-[#A0A0A0]">Consulta horarios y disponibilidad en taquilla física.</p>
+              </div>
+            )}
           </div>
 
           {/* Selector de Tráilers y Material Adicional */}
-          <div className="space-y-2">
-            <span className="text-[11px] font-sans font-bold uppercase tracking-wider text-[#A0A0A0] block">
-              Tráilers y Contenido Disponible:
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: 'oficial', label: 'Tráiler Oficial', icon: 'fa-play' },
-                { id: 'teaser', label: 'Teaser Tráiler', icon: 'fa-film' },
-                { id: 'trailer2', label: 'Tráiler 2', icon: 'fa-clapperboard' },
-                { id: 'makingof', label: 'Detrás de Cámaras', icon: 'fa-video' },
-              ].map((item) => {
-                const isActive = activeTrailerQuery === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActiveTrailerQuery(item.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold font-sans uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
-                      isActive
-                        ? 'bg-[#E11D2F] text-white shadow-md'
-                        : 'bg-[#0A0A0A] text-[#A0A0A0] hover:text-white border border-[#262626]'
-                    }`}
-                  >
-                    <i className={`fa-solid ${item.icon} text-[10px]`} />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
+          {trailerData && trailerData.trailers && trailerData.trailers.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-[11px] font-sans font-bold uppercase tracking-wider text-[#A0A0A0] block">
+                Tráilers y Contenido Disponible:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {trailerData.trailers.map((item) => {
+                  const isActive = selectedTrailerKey === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setSelectedTrailerKey(item.key)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold font-sans uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
+                        isActive
+                          ? 'bg-[#E11D2F] text-white shadow-md'
+                          : 'bg-[#0A0A0A] text-[#A0A0A0] hover:text-white border border-[#262626]'
+                      }`}
+                    >
+                      <i className="fa-solid fa-play text-[10px]" />
+                      <span>{item.nombre}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Pie del Reproductor con Acciones Rápidas */}
           <div className="pt-3 border-t border-[#262626] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

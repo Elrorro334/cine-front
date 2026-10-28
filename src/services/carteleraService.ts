@@ -8,6 +8,7 @@ import {
   PromocionDto,
   CrearPreordenDto,
   PreordenDto,
+  PeliculaTrailerDto,
 } from '@/types/api';
 import { Movie, Promotion } from '@/types/cartelera';
 
@@ -166,5 +167,16 @@ export const carteleraService = {
    */
   async obtenerPreorden(codigoQr: string): Promise<PreordenDto> {
     return apiFetch<PreordenDto>(`/taquilla/preorden/${encodeURIComponent(codigoQr)}`);
+  },
+
+  /**
+   * Obtiene los tráilers oficiales y videos de una película desde la API .NET
+   */
+  async obtenerTrailer(idPelicula: number): Promise<PeliculaTrailerDto | null> {
+    try {
+      return await apiFetch<PeliculaTrailerDto>(`/cartelera/trailer/${idPelicula}`);
+    } catch {
+      return null;
+    }
   },
 };
