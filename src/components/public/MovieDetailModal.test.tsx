@@ -101,14 +101,10 @@ describe('MovieDetailModal Component', () => {
     const trailerBtn = screen.getByRole('button', { name: /Ver Tráiler/i });
     fireEvent.click(trailerBtn);
 
-    // El modal de tráiler se abre dentro de la página sin redirigir al navegador externo
+    // El modal de tráiler se abre dentro de la página con el tráiler oficial
     expect(screen.getByRole('dialog', { name: /Tráiler de Resident Evil: Noche cero/i })).toBeInTheDocument();
     expect(await screen.findByTitle(/Tráiler de Resident Evil: Noche cero/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Cerrar tráiler/i })).toBeInTheDocument();
-
-    // Permite cambiar entre tráilers disponibles
-    const teaserBtn = await screen.findByRole('button', { name: /Teaser Tráiler/i });
-    fireEvent.click(teaserBtn);
 
     // Permite cerrar el tráiler y mantenerse en la página
     const cerrarTrailerBtn = screen.getByRole('button', { name: /Cerrar tráiler/i });

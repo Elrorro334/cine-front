@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Movie } from '@/types/cartelera';
 import { carteleraService } from '@/services/carteleraService';
-import { PeliculaTrailerDto } from '@/types/api';
 
 interface MovieDetailModalProps {
   readonly movie: Movie | null;
@@ -16,7 +15,6 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
   const router = useRouter();
   const [selectedHorarioOverride, setSelectedHorarioOverride] = useState<string | null>(null);
   const [isTrailerOpen, setIsTrailerOpen] = useState(false);
-  const [trailerData, setTrailerData] = useState<PeliculaTrailerDto | null>(null);
   const [selectedTrailerKey, setSelectedTrailerKey] = useState<string | null>(null);
   const [loadingTrailer, setLoadingTrailer] = useState(false);
 
@@ -26,7 +24,6 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
     } else {
       document.body.style.overflow = 'unset';
       setIsTrailerOpen(false);
-      setTrailerData(null);
       setSelectedTrailerKey(null);
     }
 
@@ -69,7 +66,6 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
     try {
       const data = await carteleraService.obtenerTrailer(movie.id);
       if (data && data.trailerKey) {
-        setTrailerData(data);
         setSelectedTrailerKey(data.trailerKey);
       } else if (movie.trailerKey) {
         setSelectedTrailerKey(movie.trailerKey);
@@ -303,35 +299,6 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
               </div>
             )}
           </div>
-
-          {/* Selector de Tráilers y Material Adicional */}
-          {trailerData && trailerData.trailers && trailerData.trailers.length > 0 && (
-            <div className="space-y-2">
-              <span className="text-[11px] font-sans font-bold uppercase tracking-wider text-[#A0A0A0] block">
-                Tráilers y Contenido Disponible:
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {trailerData.trailers.map((item) => {
-                  const isActive = selectedTrailerKey === item.key;
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setSelectedTrailerKey(item.key)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold font-sans uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
-                        isActive
-                          ? 'bg-[#E11D2F] text-white shadow-md'
-                          : 'bg-[#0A0A0A] text-[#A0A0A0] hover:text-white border border-[#262626]'
-                      }`}
-                    >
-                      <i className="fa-solid fa-play text-[10px]" />
-                      <span>{item.nombre}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Pie del Reproductor con Acciones Rápidas */}
           <div className="pt-3 border-t border-[#262626] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
