@@ -2,6 +2,27 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import MovieDetailModal from './MovieDetailModal';
 import { Movie } from '@/types/cartelera';
 
+const mockPush = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
+
+jest.mock('@/services/carteleraService', () => ({
+  carteleraService: {
+    obtenerTrailer: jest.fn().mockResolvedValue({
+      idPelicula: 1,
+      titulo: 'Resident Evil: Noche cero',
+      trailerKey: 'dQw4w9WgXcQ',
+      trailers: [
+        { key: 'dQw4w9WgXcQ', nombre: 'Tráiler Oficial', tipo: 'Trailer' },
+        { key: 'teaser123', nombre: 'Teaser Tráiler', tipo: 'Teaser' },
+      ],
+    }),
+  },
+}));
+
 const mockMovie: Movie = {
   id: 1,
   title: 'Resident Evil: Noche cero',
@@ -18,6 +39,7 @@ const mockMovie: Movie = {
   director: 'Director de prueba',
   actors: 'Actor 1, Actor 2',
   showtimes: ['11:30', '15:00'],
+  trailerKey: 'dQw4w9WgXcQ',
 };
 
 describe('MovieDetailModal Component', () => {
@@ -61,6 +83,33 @@ describe('MovieDetailModal Component', () => {
     fireEvent.click(horarioBtn);
 
     expect(screen.getByText(/Función seleccionada: 11:30 hrs/i)).toBeInTheDocument();
+  });
+
+  test('navega a /preorden al hacer clic en Generar Pre-Orden (Ticket QR)', () => {
+    render(<MovieDetailModal isOpen={true} movie={mockMovie} onClose={mockOnClose} />);
+
+    const preordenBtn = screen.getByRole('button', { name: /Generar Pre-Orden \(Ticket QR\)/i });
+    fireEvent.click(preordenBtn);
+
+    expect(mockOnClose).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('/preorden?peli=1'));
+  });
+
+  test('abre el modal reproductor de tráiler dentro de la página al hacer clic en Ver Tráiler', async () => {
+    render(<MovieDetailModal isOpen={true} movie={mockMovie} onClose={mockOnClose} />);
+
+    const trailerBtn = screen.getByRole('button', { name: /Ver Tráiler/i });
+    fireEvent.click(trailerBtn);
+
+    // El modal de tráiler se abre dentro de la página con el tráiler oficial
+    expect(screen.getByRole('dialog', { name: /Tráiler de Resident Evil: Noche cero/i })).toBeInTheDocument();
+    expect(await screen.findByTitle(/Tráiler de Resident Evil: Noche cero/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Cerrar tráiler/i })).toBeInTheDocument();
+
+    // Permite cerrar el tráiler y mantenerse en la página
+    const cerrarTrailerBtn = screen.getByRole('button', { name: /Cerrar tráiler/i });
+    fireEvent.click(cerrarTrailerBtn);
+    expect(screen.queryByTitle(/Tráiler de Resident Evil: Noche cero/i)).toBeNull();
   });
 
   test('llama a onClose al presionar el botón de cerrar y la tecla Escape', () => {
