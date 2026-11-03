@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import PosPage from './page';
 import { taquillaService } from '@/services/taquillaService';
+import { PreordenDto } from '@/types/api';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -25,7 +26,38 @@ jest.mock('@/services/taquillaService', () => ({
   },
 }));
 
+const crearPreordenMock = (overrides: Partial<PreordenDto> = {}): PreordenDto => ({
+  idPreorden: 5,
+  codigo: 'PRE-XIL-001',
+  cliente: 'Ana López',
+  telefono: '5551234567',
+  pelicula: 'Avatar',
+  horario: '19:00',
+  idFuncion: 20,
+  boletosGeneral: 2,
+  precioBoleto: 50,
+  asientos: [],
+  combos: [],
+  total: 100,
+  fechaCreacion: '2026-10-21',
+  vigenciaDias: 8,
+  estadoActivo: true,
+  ...overrides,
+});
+
 describe('PosPage Component', () => {
+  const escanearQr = async (codigo: string) => {
+    await waitFor(() => {
+      expect(screen.getByText('Spider-Man')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Escanear QR/i }));
+    fireEvent.change(screen.getByPlaceholderText(/Escribir o escanear folio/i), {
+      target: { value: codigo },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Validar e Ingresar/i }));
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     (taquillaService.getCartelera as jest.Mock).mockResolvedValue([
@@ -80,6 +112,14 @@ describe('PosPage Component', () => {
       expect(taquillaService.getButacasFuncion).toHaveBeenCalledWith(10);
       expect(screen.getAllByText(/Spider-Man/i).length).toBeGreaterThan(0);
     });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Butaca A1' }));
+    fireEvent.click(screen.getByRole('button', { name: /Agregar a Venta/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Spider-Man \(15:00\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Asientos: A1/i)).toBeInTheDocument();
+    });
   });
 
   test('permite agregar productos de dulcería y procesar cobro en efectivo', async () => {
@@ -110,6 +150,111 @@ describe('PosPage Component', () => {
 
     await waitFor(() => {
       expect(taquillaService.registrarVenta).toHaveBeenCalled();
+    });
+  });
+
+  test('al canjear una pre-orden QR exige exactamente sus butacas y agrega combos', async () => {
+    (taquillaService.getPreorden as jest.Mock).mockResolvedValue(
+      crearPreordenMock({
+        combos: [{ nombre: 'Combo Pareja', cantidad: 1, precio: 110 }],
+        total: 210,
+      })
+    );
+    (taquillaService.getButacasFuncion as jest.Mock).mockResolvedValue({
+      idFuncion: 20,
+      idSala: 1,
+      nombreSala: 'Sala 1',
+      precio: 50,
+      butacas: [
+        { idButaca: 1, fila: 'A', numero: 1, codigo: 'A1', estaOcupada: false },
+        { idButaca: 2, fila: 'A', numero: 2, codigo: 'A2', estaOcupada: false },
+        { idButaca: 3, fila: 'A', numero: 3, codigo: 'A3', estaOcupada: false },
+      ],
+    });
+
+    render(<PosPage />);
+    await escanearQr('pre-xil-001');
+
+    await waitFor(() => {
+      expect(taquillaService.getPreorden).toHaveBeenCalledWith('PRE-XIL-001');
+      expect(taquillaService.getButacasFuncion).toHaveBeenCalledWith(20);
+    });
+
+    expect(screen.getByText(/Selecciona exactamente/i)).toBeInTheDocument();
+
+    const confirmar = screen.getByRole('button', { name: /Agregar a Venta/i });
+    expect(confirmar).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Butaca A1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Butaca A2' }));
+
+    expect(confirmar).toBeEnabled();
+    fireEvent.click(confirmar);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Avatar \(19:00\) - Ana López/i)).toBeInTheDocument();
+      expect(screen.getByText(/Asientos: A1, A2/i)).toBeInTheDocument();
+      expect(screen.getByText('Combo Pareja')).toBeInTheDocument();
+    });
+  });
+
+  test('rechaza una pre-orden inactiva sin abrir el mapa de butacas', async () => {
+    (taquillaService.getPreorden as jest.Mock).mockResolvedValue(
+      crearPreordenMock({
+        idPreorden: 6,
+        codigo: 'PRE-XIL-002',
+        estadoActivo: false,
+      })
+    );
+
+    render(<PosPage />);
+    await escanearQr('PRE-XIL-002');
+
+    await waitFor(() => {
+      expect(screen.getByText(/cancelada o inactiva/i)).toBeInTheDocument();
+    });
+    expect(taquillaService.getButacasFuncion).not.toHaveBeenCalled();
+  });
+
+  test('rechaza una pre-orden sin boletos para canjear', async () => {
+    (taquillaService.getPreorden as jest.Mock).mockResolvedValue(
+      crearPreordenMock({
+        idPreorden: 7,
+        codigo: 'PRE-XIL-004',
+        boletosGeneral: 0,
+        total: 0,
+      })
+    );
+
+    render(<PosPage />);
+    await escanearQr('PRE-XIL-004');
+
+    await waitFor(() => {
+      expect(screen.getByText(/no contiene boletos/i)).toBeInTheDocument();
+    });
+    expect(taquillaService.getButacasFuncion).not.toHaveBeenCalled();
+  });
+
+  test('rechaza un código QR que no existe en la base de datos', async () => {
+    (taquillaService.getPreorden as jest.Mock).mockResolvedValue(null);
+
+    render(<PosPage />);
+    await escanearQr('PRE-INEXISTENTE');
+
+    await waitFor(() => {
+      expect(screen.getByText(/no encontrado en base de datos/i)).toBeInTheDocument();
+    });
+    expect(taquillaService.getButacasFuncion).not.toHaveBeenCalled();
+  });
+
+  test('muestra un mensaje cuando la pre-orden no se puede validar', async () => {
+    (taquillaService.getPreorden as jest.Mock).mockRejectedValue(new Error('fallo de red'));
+
+    render(<PosPage />);
+    await escanearQr('PRE-XIL-003');
+
+    await waitFor(() => {
+      expect(screen.getByText(/Error al validar la pre-orden/i)).toBeInTheDocument();
     });
   });
 

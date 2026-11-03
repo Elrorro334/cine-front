@@ -105,6 +105,8 @@ export interface FuncionButacasDto {
   idFuncion: number;
   idSala: number;
   nombreSala: string;
+  peliculaTitulo?: string;
+  horario?: string;
   precio: number;
   butacas: ButacaDto[];
 }

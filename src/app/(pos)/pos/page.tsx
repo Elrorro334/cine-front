@@ -1,12 +1,14 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/authService';
 import { taquillaService } from '@/services/taquillaService';
+import { ApiError } from '@/lib/apiClient';
 import {
   PeliculaCarteleraDto,
   FuncionHorarioDto,
+  PreordenDto,
   ProductoDto,
   RegistrarVentaDto,
 } from '@/types/api';
@@ -54,9 +56,11 @@ export default function PosPage() {
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState<boolean>(false);
   const [isTmdbModalOpen, setIsTmdbModalOpen] = useState<boolean>(false);
+  const [requiredSeats, setRequiredSeats] = useState<number | undefined>(undefined);
 
   const [selectedPeli, setSelectedPeli] = useState<PeliculaCarteleraDto | null>(null);
   const [selectedFuncion, setSelectedFuncion] = useState<FuncionHorarioDto | null>(null);
+  const [pendingPreorden, setPendingPreorden] = useState<PreordenDto | null>(null);
 
   const [metodoPago, setMetodoPago] = useState<'Efectivo' | 'Tarjeta Mercado Pago'>('Efectivo');
   const [ticketFolio, setTicketFolio] = useState<string>('');
@@ -148,10 +152,46 @@ export default function PosPage() {
   const openSeatModal = (pelicula: PeliculaCarteleraDto, funcion: FuncionHorarioDto) => {
     setSelectedPeli(pelicula);
     setSelectedFuncion(funcion);
+    setRequiredSeats(undefined);
+    setPendingPreorden(null);
     setIsSeatModalOpen(true);
   };
 
+  const agregarPreordenAlCarrito = (pre: PreordenDto, asientos: string[]) => {
+    agregarAlCarrito(
+      `pre_bol_${pre.codigo}`,
+      'boleto',
+      `${pre.pelicula} (${pre.horario.substring(0, 5)}) - ${pre.cliente}`,
+      pre.precioBoleto,
+      asientos.length,
+      {
+        idFuncion: pre.idFuncion,
+        horario: pre.horario,
+        sku: 'BOL-GEN',
+        asientos,
+      }
+    );
+
+    (pre.combos ?? []).forEach((combo, index) => {
+      agregarAlCarrito(
+        `pre_cmb_${pre.codigo}_${index}`,
+        'dulceria',
+        combo.nombre,
+        combo.precio,
+        combo.cantidad
+      );
+    });
+  };
+
   const handleSeatsConfirmed = (asientos: string[]) => {
+    // Canje de pre-orden QR: se exige seleccionar exactamente los boletos apartados.
+    if (pendingPreorden) {
+      agregarPreordenAlCarrito(pendingPreorden, asientos);
+      setPendingPreorden(null);
+      setPasoActual(3);
+      return;
+    }
+
     if (!selectedPeli || !selectedFuncion) return;
     const idUnico = `bol_${selectedFuncion.idFuncion}_${Date.now()}`;
 
@@ -172,43 +212,41 @@ export default function PosPage() {
   };
 
   const handleQrSuccess = async (codigo: string) => {
+    setMensajeFeedback(null);
     try {
       const pre = await taquillaService.getPreorden(codigo);
       if (!pre) {
-        alert('Código QR no encontrado en base de datos.');
+        setMensajeFeedback('Código QR no encontrado en base de datos.');
         return;
       }
 
-      // Agregar boletos de la pre-orden
-      if (pre.boletosGeneral > 0) {
-        agregarAlCarrito(
-          `pre_bol_${pre.codigo}`,
-          'boleto',
-          `${pre.pelicula} (${pre.horario}) - ${pre.cliente}`,
-          pre.precioBoleto,
-          pre.boletosGeneral,
-          {
-            idFuncion: pre.idFuncion,
-            sku: 'BOL-GEN',
-            asientos: pre.asientos,
-          }
-        );
+      if (!pre.estadoActivo) {
+        setMensajeFeedback('La pre-orden se encuentra cancelada o inactiva.');
+        return;
       }
 
-      // Agregar combos de la pre-orden
-      pre.combos.forEach((combo) => {
-        agregarAlCarrito(
-          `pre_cmb_${combo.nombre}_${Date.now()}`,
-          'dulceria',
-          combo.nombre,
-          combo.precio,
-          combo.cantidad
-        );
-      });
+      if (pre.boletosGeneral <= 0) {
+        setMensajeFeedback('La pre-orden no contiene boletos para canjear.');
+        return;
+      }
 
-      setPasoActual(3);
+      // HU-06: el cajero debe elegir exactamente los boletos apartados en el mapa.
+      setPendingPreorden(pre);
+      setSelectedPeli({
+        idPelicula: 0,
+        titulo: pre.pelicula,
+        funciones: [],
+      });
+      setSelectedFuncion({
+        idFuncion: pre.idFuncion,
+        hora: pre.horario,
+        nombreSala: '',
+        precio: pre.precioBoleto,
+      });
+      setRequiredSeats(pre.boletosGeneral);
+      setIsSeatModalOpen(true);
     } catch {
-      alert('Error al validar la pre-orden desde SQL Server.');
+      setMensajeFeedback('Error al validar la pre-orden desde SQL Server.');
     }
   };
 
@@ -244,7 +282,11 @@ export default function PosPage() {
       void fetchDulceria();
     } catch (err) {
       console.error('Error registrando venta:', err);
-      setMensajeFeedback('Error al procesar la venta en la base de datos.');
+      if (err instanceof ApiError && err.status === 409) {
+        setMensajeFeedback('Asiento no disponible: ' + (err.message ?? ''));
+      } else {
+        setMensajeFeedback('Error al procesar la venta en la base de datos.');
+      }
     } finally {
       setIsProcessingSale(false);
     }
@@ -255,6 +297,8 @@ export default function PosPage() {
     setPasoActual(1);
     setIsTicketModalOpen(false);
     setMensajeFeedback(null);
+    setRequiredSeats(undefined);
+    setPendingPreorden(null);
   };
 
   // Categorías únicas disponibles en el catálogo de dulcería de la BD
@@ -643,12 +687,13 @@ export default function PosPage() {
 
         <SeatMapModal
           isOpen={isSeatModalOpen}
-          onClose={() => setIsSeatModalOpen(false)}
+          onClose={() => { setIsSeatModalOpen(false); setRequiredSeats(undefined); setPendingPreorden(null); }}
           peliculaTitle={selectedPeli?.titulo || ''}
           horario={selectedFuncion?.hora || ''}
           idFuncion={selectedFuncion?.idFuncion}
           precioBoleto={selectedFuncion?.precio || 50}
           onConfirmSeats={handleSeatsConfirmed}
+          requiredSeats={requiredSeats}
         />
 
         <QrScannerModal
