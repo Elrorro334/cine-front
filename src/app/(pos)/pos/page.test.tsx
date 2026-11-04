@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import PosPage from './page';
 import { taquillaService } from '@/services/taquillaService';
-import { PreordenDto } from '@/types/api';
+import { PreordenDto, CalcularOrdenRequestDto, StockFraccionadoDto } from '@/types/api';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -20,11 +20,78 @@ jest.mock('@/services/taquillaService', () => ({
   taquillaService: {
     getCartelera: jest.fn(),
     getProductosDulceria: jest.fn(),
+    getCatalogoDulceriaPos: jest.fn(),
+    buscarProductoPorSku: jest.fn(),
+    calcularOrdenPos: jest.fn(),
     getButacasFuncion: jest.fn(),
     registrarVenta: jest.fn(),
     getPreorden: jest.fn(),
   },
 }));
+
+const productosMock = [
+  {
+    idProducto: 1,
+    sku: '7501001',
+    nombre: 'Palomitas Grandes',
+    categoria: 'Snacks',
+    precio: 50,
+    stock: 30,
+  },
+  {
+    idProducto: 2,
+    sku: '7501002',
+    nombre: 'Refresco 600ml',
+    categoria: 'Bebidas',
+    precio: 35,
+    stock: 40,
+  },
+  {
+    idProducto: 3,
+    sku: '7501003',
+    nombre: 'Nachos con Queso',
+    categoria: 'Snacks',
+    precio: 65,
+    stock: 25,
+  },
+];
+
+const pizzasMock = [
+  {
+    idProducto: 6,
+    sku: '7501006',
+    nombre: 'Rebanada Individual',
+    categoria: 'Pizzas',
+    precio: 35,
+    stock: 56,
+    esFraccionado: true,
+    factorFraccion: 1,
+    descripcionDescuento: 'Descuenta 1 rebanada del stock',
+  },
+  {
+    idProducto: 7,
+    sku: '7501007',
+    nombre: 'Pizza Completa (8 Rebanadas)',
+    categoria: 'Pizzas',
+    precio: 180,
+    stock: 7,
+    esFraccionado: true,
+    factorFraccion: 8,
+    descripcionDescuento: 'Descuenta 8 rebanadas del stock',
+  },
+];
+
+const stockFraccionadoInicial: StockFraccionadoDto = {
+  idStockFraccionado: 1,
+  nombreInsumo: 'PIZZAS',
+  stockRebanadasActual: 56,
+  factorFraccion: 8,
+  pizzasCompletasEquivalentes: 7,
+  rebanadasSueltas: 0,
+  etiquetaMonitor: 'Stock: 56 rebanadas (7 pizzas)',
+  productoRebanada: pizzasMock[0],
+  productoPizzaCompleta: pizzasMock[1],
+};
 
 const crearPreordenMock = (overrides: Partial<PreordenDto> = {}): PreordenDto => ({
   idPreorden: 5,
@@ -69,16 +136,86 @@ describe('PosPage Component', () => {
         funciones: [{ idFuncion: 10, hora: '15:00:00', precio: 50 }],
       },
     ]);
-    (taquillaService.getProductosDulceria as jest.Mock).mockResolvedValue([
-      {
-        idProducto: 1,
-        sku: 'PAL-01',
-        nombre: 'Palomitas Grandes',
-        categoria: 'Palomitas',
-        precio: 65,
-        stock: 20,
-      },
-    ]);
+    (taquillaService.getProductosDulceria as jest.Mock).mockResolvedValue(productosMock);
+    (taquillaService.getCatalogoDulceriaPos as jest.Mock).mockResolvedValue({
+      snacksYBebidas: productosMock,
+      todosLosProductos: [...productosMock, ...pizzasMock],
+      stockFraccionado: stockFraccionadoInicial,
+    });
+
+    (taquillaService.calcularOrdenPos as jest.Mock).mockImplementation(
+      async (req: CalcularOrdenRequestDto) => {
+        const todosProductos = [...productosMock, ...pizzasMock];
+        const items = (req.itemsActuales ?? []).map((item, idx) => ({
+          idLinea: item.tipo === 'boleto' ? `bol_${idx}` : `snk_${item.idProducto ?? item.sku}`,
+          idProducto: item.idProducto,
+          idFuncion: item.idFuncion,
+          sku: item.sku,
+          nombre: item.nombre,
+          tipo: item.tipo,
+          etiquetaCategoria: item.tipo === 'boleto' ? 'TAQUILLA' : 'DULCERÍA',
+          cantidad: item.cantidad,
+          precioUnitario: item.precio,
+          subtotal: item.precio * item.cantidad,
+          asientos: item.asientos,
+        }));
+
+        if (req.skuAgregar || req.idProductoAgregar) {
+          const prod = todosProductos.find(
+            (p) => p.sku === req.skuAgregar || p.idProducto === req.idProductoAgregar
+          );
+          if (prod && prod.stock > 0) {
+            const delta = req.cantidadAgregar ?? 1;
+            const idx = items.findIndex((i) => i.idProducto === prod.idProducto || i.sku === prod.sku);
+            if (idx >= 0) {
+              items[idx].cantidad += delta;
+              items[idx].subtotal = items[idx].cantidad * items[idx].precioUnitario;
+            } else if (delta > 0) {
+              items.push({
+                idLinea: `snk_${prod.idProducto}`,
+                idProducto: prod.idProducto,
+                idFuncion: undefined,
+                sku: prod.sku,
+                nombre: prod.nombre,
+                tipo: 'dulceria',
+                etiquetaCategoria: 'DULCERÍA',
+                cantidad: delta,
+                precioUnitario: prod.precio,
+                subtotal: prod.precio * delta,
+                asientos: undefined,
+              });
+            }
+          }
+        }
+
+        const rebanadasEnCarrito = items.reduce((acc, i) => {
+          if (i.sku === '7501006') return acc + i.cantidad;
+          if (i.sku === '7501007') return acc + i.cantidad * 8;
+          return acc;
+        }, 0);
+        const rebanadasRestantes = 56 - rebanadasEnCarrito;
+        const pizzasRestantes = Math.floor(rebanadasRestantes / 8);
+
+        return {
+          items,
+          totalArticulos: items.reduce((acc, i) => acc + i.cantidad, 0),
+          subtotalBoletos: items
+            .filter((i) => i.tipo === 'boleto')
+            .reduce((acc, i) => acc + i.subtotal, 0),
+          subtotalDulceria: items
+            .filter((i) => i.tipo !== 'boleto')
+            .reduce((acc, i) => acc + i.subtotal, 0),
+          totalVenta: items.reduce((acc, i) => acc + i.subtotal, 0),
+          stockFraccionado: {
+            ...stockFraccionadoInicial,
+            stockRebanadasActual: rebanadasRestantes,
+            pizzasCompletasEquivalentes: pizzasRestantes,
+            etiquetaMonitor: `Stock: ${rebanadasRestantes} rebanadas (${pizzasRestantes} pizzas)`,
+          },
+        };
+      }
+    );
+
     (taquillaService.getButacasFuncion as jest.Mock).mockResolvedValue({
       idFuncion: 10,
       idSala: 1,
@@ -137,7 +274,12 @@ describe('PosPage Component', () => {
     });
 
     // Agregar palomitas al carrito
-    fireEvent.click(screen.getByRole('button', { name: /Agregar/i }));
+    const botonesAgregar = screen.getAllByRole('button', { name: /Agregar/i });
+    fireEvent.click(botonesAgregar[0]);
+
+    await waitFor(() => {
+      expect(taquillaService.calcularOrdenPos).toHaveBeenCalled();
+    });
 
     // Ir al Paso 3: Cobro
     fireEvent.click(screen.getByRole('button', { name: /Paso 3: Cobrar/i }));
@@ -150,6 +292,78 @@ describe('PosPage Component', () => {
 
     await waitFor(() => {
       expect(taquillaService.registrarVenta).toHaveBeenCalled();
+    });
+  });
+
+  test('HU-07 Escenario 1: escanear código de barras SKU 7501001 agrega Palomitas Grandes ($50.00) al resumen', async () => {
+    render(<PosPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Spider-Man')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /2\. Dulcería & Combos/i }));
+
+    const inputSku = await screen.findByPlaceholderText(/ESCANEAR SKU \(EJ: 7501001\)/i);
+    fireEvent.change(inputSku, { target: { value: '7501001' } });
+    fireEvent.keyDown(inputSku, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(taquillaService.calcularOrdenPos).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skuAgregar: '7501001',
+          cantidadAgregar: 1,
+        })
+      );
+      expect(screen.getByText('1 items')).toBeInTheDocument();
+      expect(screen.getByText('$50.00')).toBeInTheDocument();
+    });
+  });
+
+  test('HU-07 Escenario 2: clic táctil en tarjeta Nachos con Queso agrega 1 unidad ($65.00) a la orden', async () => {
+    render(<PosPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Spider-Man')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /2\. Dulcería & Combos/i }));
+
+    const nachosCard = await screen.findByText('Nachos con Queso');
+    fireEvent.click(nachosCard);
+
+    await waitFor(() => {
+      expect(taquillaService.calcularOrdenPos).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idProductoAgregar: 3,
+          skuAgregar: '7501003',
+          cantidadAgregar: 1,
+        })
+      );
+      expect(screen.getByText('$65.00')).toBeInTheDocument();
+    });
+  });
+
+  test('HU-07 Escenario 3: seleccionar Rebanada Individual actualiza el monitor de 56 rebanadas a 55 rebanadas en tiempo real', async () => {
+    render(<PosPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Spider-Man')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /2\. Dulcería & Combos/i }));
+
+    const monitor = await screen.findByTestId('pizza-stock-monitor');
+    expect(monitor).toHaveTextContent('Stock: 56 rebanadas (7 pizzas)');
+
+    const rebanadaBtn = screen.getByRole('button', { name: /Rebanada Individual/i });
+    fireEvent.click(rebanadaBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pizza-stock-monitor')).toHaveTextContent(
+        'Stock: 55 rebanadas (6 pizzas)'
+      );
+      expect(screen.getAllByText('$35.00').length).toBeGreaterThan(0);
     });
   });
 

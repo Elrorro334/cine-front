@@ -62,6 +62,89 @@ describe('taquillaService', () => {
     expect(res).toEqual(mockDulceria);
   });
 
+  test('getCatalogoDulceriaPos retorna snacks, pizzas y monitor de stock fraccionado', async () => {
+    const mockCatalogo = {
+      snacksYBebidas: [
+        { idProducto: 1, sku: '7501001', nombre: 'Palomitas Grandes', categoria: 'Snacks', precio: 50, stock: 30 },
+      ],
+      todosLosProductos: [],
+      stockFraccionado: {
+        idStockFraccionado: 1,
+        nombreInsumo: 'PIZZAS',
+        stockRebanadasActual: 56,
+        factorFraccion: 8,
+        pizzasCompletasEquivalentes: 7,
+        rebanadasSueltas: 0,
+        etiquetaMonitor: 'Stock: 56 rebanadas (7 pizzas)',
+      },
+    };
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockCatalogo,
+    });
+
+    const res = await taquillaService.getCatalogoDulceriaPos();
+    expect(res.stockFraccionado?.etiquetaMonitor).toBe('Stock: 56 rebanadas (7 pizzas)');
+    expect(res.snacksYBebidas).toHaveLength(1);
+  });
+
+  test('buscarProductoPorSku consulta un producto por su código de barras', async () => {
+    const mockProducto = {
+      idProducto: 1,
+      sku: '7501001',
+      nombre: 'Palomitas Grandes',
+      categoria: 'Snacks',
+      precio: 50,
+      stock: 30,
+    };
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockProducto,
+    });
+
+    const res = await taquillaService.buscarProductoPorSku('7501001');
+    expect(res.sku).toBe('7501001');
+    expect(res.nombre).toBe('Palomitas Grandes');
+  });
+
+  test('calcularOrdenPos envía la solicitud al backend y retorna el resumen calculado', async () => {
+    const mockResumen = {
+      items: [
+        {
+          idLinea: 'snk_1',
+          idProducto: 1,
+          sku: '7501001',
+          nombre: 'Palomitas Grandes',
+          tipo: 'dulceria',
+          etiquetaCategoria: 'DULCERÍA',
+          cantidad: 1,
+          precioUnitario: 50,
+          subtotal: 50,
+        },
+      ],
+      totalArticulos: 1,
+      subtotalBoletos: 0,
+      subtotalDulceria: 50,
+      totalVenta: 50,
+      stockFraccionado: null,
+    };
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResumen,
+    });
+
+    const res = await taquillaService.calcularOrdenPos({
+      itemsActuales: [],
+      skuAgregar: '7501001',
+      cantidadAgregar: 1,
+    });
+
+    expect(res.totalVenta).toBe(50);
+  });
+
   test('registrarVenta envía la venta y retorna el folio confirmado', async () => {
     const mockConfirmacion = {
       idVenta: 15,

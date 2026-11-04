@@ -119,6 +119,60 @@ export interface ProductoDto {
   precio: number;
   stock: number;
   img?: string;
+  esFraccionado?: boolean;
+  factorFraccion?: number;
+  descripcionDescuento?: string | null;
+}
+
+// DTOs de Dulcería POS y Stock Fraccionado (HU-07)
+export interface StockFraccionadoDto {
+  idStockFraccionado: number;
+  nombreInsumo: string;
+  stockRebanadasActual: number;
+  factorFraccion: number;
+  pizzasCompletasEquivalentes: number;
+  rebanadasSueltas: number;
+  etiquetaMonitor: string;
+  productoRebanada?: ProductoDto | null;
+  productoPizzaCompleta?: ProductoDto | null;
+}
+
+export interface CatalogoDulceriaPosDto {
+  stockFraccionado?: StockFraccionadoDto | null;
+  snacksYBebidas: ProductoDto[];
+  todosLosProductos: ProductoDto[];
+}
+
+export interface CalcularOrdenRequestDto {
+  itemsActuales: RegistrarVentaItemDto[];
+  skuAgregar?: string | null;
+  idProductoAgregar?: number | null;
+  cantidadAgregar?: number;
+}
+
+export interface OrdenLineaCalculadaDto {
+  idLinea: string;
+  idProducto?: number;
+  idFuncion?: number;
+  sku: string;
+  nombre: string;
+  tipo: string;
+  etiquetaCategoria: string;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+  asientos?: string[];
+}
+
+export interface ResumenOrdenCalculadoDto {
+  items: OrdenLineaCalculadaDto[];
+  totalArticulos: number;
+  subtotalBoletos: number;
+  subtotalDulceria: number;
+  totalVenta: number;
+  stockFraccionado?: StockFraccionadoDto | null;
+  productosActualizados?: ProductoDto[];
+  productoAgregado?: ProductoDto | null;
 }
 
 export interface RegistrarVentaItemDto {
