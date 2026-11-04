@@ -5,6 +5,31 @@ import { InsumoInventarioDto, EntradaHistorialDto } from '@/types/inventario';
 import { inventarioService } from '@/services/inventarioService';
 import RegistrarEntradaModal from './RegistrarEntradaModal';
 
+function getMargenBadgeClass(margen: number): string {
+  if (margen >= 60) {
+    return 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/30';
+  }
+  if (margen >= 30) {
+    return 'bg-blue-950/40 text-blue-400 border border-blue-500/30';
+  }
+  return 'bg-red-950/40 text-red-400 border border-red-500/30';
+}
+
+function getExpandIcon(isExpanded: boolean): string {
+  if (isExpanded) return 'fa-chevron-up';
+  return 'fa-chevron-down';
+}
+
+function getExpandText(isExpanded: boolean): string {
+  if (isExpanded) return 'Ocultar';
+  return 'Ver líneas';
+}
+
+function getPreviewMargenClass(margen: number): string {
+  if (margen >= 0) return 'text-emerald-400';
+  return 'text-red-400';
+}
+
 export default function InventarioAdminView() {
   const [insumos, setInsumos] = useState<InsumoInventarioDto[]>([]);
   const [entradas, setEntradas] = useState<EntradaHistorialDto[]>([]);
@@ -41,8 +66,32 @@ export default function InventarioAdminView() {
   }, [selectedCategoria, busqueda]);
 
   useEffect(() => {
-    cargarDatos();
-  }, [cargarDatos]);
+    let isMounted = true;
+    Promise.all([
+      inventarioService.getInsumos({
+        categoria: selectedCategoria !== 'Todas' ? selectedCategoria : undefined,
+        busqueda: busqueda.trim() ? busqueda.trim() : undefined,
+      }),
+      inventarioService.getHistorialEntradas(20),
+    ])
+      .then(([insumosData, entradasData]) => {
+        if (isMounted) {
+          setInsumos(insumosData);
+          setEntradas(entradasData);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          console.error('Error al cargar datos del inventario:', err);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedCategoria, busqueda]);
 
   const handleOpenEdit = (item: InsumoInventarioDto) => {
     setEditingItem(item);
@@ -56,19 +105,19 @@ export default function InventarioAdminView() {
     setEditError(null);
   };
 
-  const handleGuardarPrecios = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGuardarPrecios = async (e?: React.SyntheticEvent) => {
+    if (e) e.preventDefault();
     if (!editingItem) return;
 
-    const costoNum = parseFloat(editCosto);
-    const precioNum = parseFloat(editPrecio);
+    const costoNum = Number.parseFloat(editCosto);
+    const precioNum = Number.parseFloat(editPrecio);
 
-    if (isNaN(costoNum) || costoNum < 0) {
+    if (Number.isNaN(costoNum) || costoNum < 0) {
       setEditError('El costo unitario debe ser un número mayor o igual a 0.');
       return;
     }
 
-    if (isNaN(precioNum) || precioNum < 0) {
+    if (Number.isNaN(precioNum) || precioNum < 0) {
       setEditError('El precio de venta debe ser un número mayor o igual a 0.');
       return;
     }
@@ -102,8 +151,8 @@ export default function InventarioAdminView() {
   };
 
   // Preview dinámico del margen en el modal de edición
-  const previewCosto = parseFloat(editCosto) || 0;
-  const previewPrecio = parseFloat(editPrecio) || 0;
+  const previewCosto = Number.parseFloat(editCosto) || 0;
+  const previewPrecio = Number.parseFloat(editPrecio) || 0;
   let previewMargen = 0;
   if (previewPrecio > 0) {
     previewMargen = Number((((previewPrecio - previewCosto) / previewPrecio) * 100).toFixed(2));
@@ -159,8 +208,12 @@ export default function InventarioAdminView() {
 
         {/* Buscador de Insumos */}
         <div className="relative w-full md:w-80">
+          <label htmlFor="search-insumos" className="sr-only">
+            Buscar por SKU o Producto
+          </label>
           <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-[#737373] text-xs" />
           <input
+            id="search-insumos"
             type="text"
             placeholder="Buscar por SKU o Producto..."
             value={busqueda}
@@ -284,15 +337,7 @@ export default function InventarioAdminView() {
 
                       {/* 8. Margen (%) Recalculado */}
                       <td className="py-3 px-4 text-center font-mono">
-                        <span
-                          className={`px-2 py-1 rounded-md text-xs font-bold ${
-                            item.margenPorcentaje >= 60
-                              ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/30'
-                              : item.margenPorcentaje >= 30
-                              ? 'bg-blue-950/40 text-blue-400 border border-blue-500/30'
-                              : 'bg-red-950/40 text-red-400 border border-red-500/30'
-                          }`}
-                        >
+                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${getMargenBadgeClass(item.margenPorcentaje)}`}>
                           {item.margenPorcentaje.toFixed(2)}%
                         </span>
                       </td>
@@ -400,14 +445,8 @@ export default function InventarioAdminView() {
                             }
                             className="text-[#a3a3a3] hover:text-white px-2 py-1 rounded bg-[#1c1c1c] text-xs font-medium"
                           >
-                            <i
-                              className={`fa-solid ${
-                                expandedFacturaId === entrada.idFactura
-                                  ? 'fa-chevron-up'
-                                  : 'fa-chevron-down'
-                              } mr-1`}
-                            />
-                            {expandedFacturaId === entrada.idFactura ? 'Ocultar' : 'Ver líneas'}
+                            <i className={`fa-solid ${getExpandIcon(expandedFacturaId === entrada.idFactura)} mr-1`} />
+                            {getExpandText(expandedFacturaId === entrada.idFactura)}
                           </button>
                         </td>
                       </tr>
@@ -461,11 +500,7 @@ export default function InventarioAdminView() {
 
       {/* MODAL DE EDICIÓN DE PRECIOS Y COSTOS (CRITERIO 3) */}
       {editingItem && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="bg-[#141414] border border-[#262626] rounded-2xl w-full max-w-md p-6 shadow-2xl text-[#f3f4f6] space-y-5">
             <div className="flex items-center justify-between border-b border-[#262626] pb-3">
               <div>
@@ -495,10 +530,14 @@ export default function InventarioAdminView() {
 
             <form onSubmit={handleGuardarPrecios} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#d4d4d4] mb-1">
+                <label
+                  htmlFor="input-edit-costo"
+                  className="block text-xs font-semibold text-[#d4d4d4] mb-1"
+                >
                   6. Costo Unitario ($)
                 </label>
                 <input
+                  id="input-edit-costo"
                   type="number"
                   step="0.01"
                   min="0"
@@ -510,10 +549,14 @@ export default function InventarioAdminView() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#d4d4d4] mb-1">
+                <label
+                  htmlFor="input-edit-precio"
+                  className="block text-xs font-semibold text-[#d4d4d4] mb-1"
+                >
                   7. Precio de Venta ($)
                 </label>
                 <input
+                  id="input-edit-precio"
                   type="number"
                   step="0.01"
                   min="0"
@@ -529,11 +572,7 @@ export default function InventarioAdminView() {
                 <span className="text-xs font-semibold text-[#a3a3a3]">
                   8. Margen Recalculado:
                 </span>
-                <span
-                  className={`font-mono text-sm font-bold ${
-                    previewMargen >= 0 ? 'text-emerald-400' : 'text-red-400'
-                  }`}
-                >
+                <span className={`font-mono text-sm font-bold ${getPreviewMargenClass(previewMargen)}`}>
                   {previewMargen.toFixed(2)}%
                 </span>
               </div>

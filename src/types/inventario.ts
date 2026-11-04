@@ -2,11 +2,13 @@
  * DTOs para la HU-11: Gestión de Inventario Maestro y Registro de Entradas
  */
 
+export type CategoriaInsumo = 'Snacks' | 'Bebidas' | 'Dulces' | 'Comida';
+
 export interface InsumoInventarioDto {
   idProducto: number;
   sku: string;
   producto: string;
-  categoria: 'Snacks' | 'Bebidas' | 'Dulces' | 'Comida' | string;
+  categoria: CategoriaInsumo;
   stockActual: number;
   minimoAlerta: number;
   costoUnitario: number;

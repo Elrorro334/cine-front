@@ -5,21 +5,74 @@ import {
   InsumoInventarioDto,
   ProveedorDto,
   RegistrarEntradaDto,
-  RegistrarEntradaLineaDto,
 } from '@/types/inventario';
 import { inventarioService } from '@/services/inventarioService';
 
 interface RegistrarEntradaModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-  insumosDisponibles: InsumoInventarioDto[];
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onSuccess: () => void;
+  readonly insumosDisponibles: readonly InsumoInventarioDto[];
 }
 
 interface FormLinea {
+  readonly keyId: string;
   idProducto: number;
   cantidad: number;
   costoUnitario: number;
+}
+
+function generarKeyId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+function validarLineas(
+  lineas: readonly FormLinea[],
+  insumosDisponibles: readonly InsumoInventarioDto[]
+): string | null {
+  for (const linea of lineas) {
+    if (!linea.idProducto) {
+      return 'Seleccione un insumo válido para cada línea.';
+    }
+    if (linea.cantidad <= 0) {
+      return 'La cantidad debe ser mayor a 0 en todas las líneas.';
+    }
+    if (linea.costoUnitario < 0) {
+      return 'El costo unitario no puede ser negativo.';
+    }
+
+    const prod = insumosDisponibles.find((p) => p.idProducto === linea.idProducto);
+    if (prod && linea.costoUnitario > prod.precioVenta) {
+      return `El costo ($${linea.costoUnitario.toFixed(2)}) de '${prod.producto}' excede su precio de venta ($${prod.precioVenta.toFixed(2)}). Regla de protección de margen negativo.`;
+    }
+  }
+  return null;
+}
+
+function validarCamposFactura(
+  selectedProveedor: number | '',
+  folioFactura: string,
+  totalPagado: string,
+  totalCalculado: number
+): { error: string | null; totalNum: number } {
+  if (!selectedProveedor) {
+    return { error: 'Seleccione un proveedor.', totalNum: 0 };
+  }
+  if (!folioFactura.trim()) {
+    return { error: 'Ingrese el folio de la factura.', totalNum: 0 };
+  }
+
+  const totalNum = Number.parseFloat(totalPagado);
+  if (Number.isNaN(totalNum) || totalNum <= 0) {
+    return { error: 'Ingrese un total pagado válido mayor a 0.', totalNum: 0 };
+  }
+  if (Math.abs(totalNum - totalCalculado) > 0.01) {
+    return {
+      error: `El total pagado ($${totalNum.toFixed(2)}) no coincide con la suma calculada de las líneas ($${totalCalculado.toFixed(2)}).`,
+      totalNum: 0,
+    };
+  }
+  return { error: null, totalNum };
 }
 
 export default function RegistrarEntradaModal({
@@ -32,38 +85,58 @@ export default function RegistrarEntradaModal({
   const [selectedProveedor, setSelectedProveedor] = useState<number | ''>('');
   const [folioFactura, setFolioFactura] = useState<string>('');
   const [totalPagado, setTotalPagado] = useState<string>('');
-  const [lineas, setLineas] = useState<FormLinea[]>([]);
+  const [lineas, setLineas] = useState<FormLinea[]>([
+    {
+      keyId: 'initial-line',
+      idProducto: insumosDisponibles[0]?.idProducto || 0,
+      cantidad: 1,
+      costoUnitario: insumosDisponibles[0]?.costoUnitario || 0,
+    },
+  ]);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const handleCloseModal = () => {
+    setErrorMessage(null);
+    setFolioFactura('');
+    setTotalPagado('');
+    setLineas([
+      {
+        keyId: generarKeyId(),
+        idProducto: insumosDisponibles[0]?.idProducto || 0,
+        cantidad: 1,
+        costoUnitario: insumosDisponibles[0]?.costoUnitario || 0,
+      },
+    ]);
+    onClose();
+  };
+
   // Cargar lista de proveedores al abrir el modal
   useEffect(() => {
-    if (isOpen) {
-      setErrorMessage(null);
-      setFolioFactura('');
-      setTotalPagado('');
-      setLineas([
-        {
-          idProducto: insumosDisponibles[0]?.idProducto || 0,
-          cantidad: 1,
-          costoUnitario: insumosDisponibles[0]?.costoUnitario || 0,
-        },
-      ]);
+    if (!isOpen) return;
 
-      inventarioService
-        .getProveedores()
-        .then((res) => {
+    let isMounted = true;
+    inventarioService
+      .getProveedores()
+      .then((res) => {
+        if (isMounted) {
           setProveedores(res);
           if (res.length > 0) {
             setSelectedProveedor(res[0].idProveedor);
           }
-        })
-        .catch((err) => {
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
           console.error('Error al cargar proveedores:', err);
           setErrorMessage('No se pudo cargar la lista de proveedores.');
-        });
-    }
-  }, [isOpen, insumosDisponibles]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -77,34 +150,35 @@ export default function RegistrarEntradaModal({
     const defaultCost = insumosDisponibles[0]?.costoUnitario || 0;
     setLineas([
       ...lineas,
-      { idProducto: firstId, cantidad: 1, costoUnitario: defaultCost },
+      { keyId: generarKeyId(), idProducto: firstId, cantidad: 1, costoUnitario: defaultCost },
     ]);
   };
 
-  const handleRemoveLinea = (index: number) => {
+  const handleRemoveLinea = (keyId: string) => {
     if (lineas.length === 1) {
       setErrorMessage('La factura debe tener al menos una línea de insumo.');
       return;
     }
-    setLineas(lineas.filter((_, i) => i !== index));
+    setLineas(lineas.filter((l) => l.keyId !== keyId));
   };
 
   const handleLineaChange = (
-    index: number,
-    field: keyof FormLinea,
+    keyId: string,
+    field: 'idProducto' | 'cantidad' | 'costoUnitario',
     value: number
   ) => {
-    const updated = [...lineas];
-    if (field === 'idProducto') {
-      const selectedProd = insumosDisponibles.find((p) => p.idProducto === value);
-      updated[index] = {
-        ...updated[index],
-        idProducto: value,
-        costoUnitario: selectedProd ? selectedProd.costoUnitario : updated[index].costoUnitario,
-      };
-    } else {
-      updated[index] = { ...updated[index], [field]: value };
-    }
+    const updated = lineas.map((item) => {
+      if (item.keyId !== keyId) return item;
+      if (field === 'idProducto') {
+        const selectedProd = insumosDisponibles.find((p) => p.idProducto === value);
+        return {
+          ...item,
+          idProducto: value,
+          costoUnitario: selectedProd ? selectedProd.costoUnitario : item.costoUnitario,
+        };
+      }
+      return { ...item, [field]: value };
+    });
     setLineas(updated);
   };
 
@@ -112,54 +186,25 @@ export default function RegistrarEntradaModal({
     setTotalPagado(totalCalculado.toFixed(2));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.SyntheticEvent) => {
+    if (e) e.preventDefault();
     setErrorMessage(null);
 
-    if (!selectedProveedor) {
-      setErrorMessage('Seleccione un proveedor.');
+    const validacionFactura = validarCamposFactura(
+      selectedProveedor,
+      folioFactura,
+      totalPagado,
+      totalCalculado
+    );
+    if (validacionFactura.error) {
+      setErrorMessage(validacionFactura.error);
       return;
     }
 
-    if (!folioFactura.trim()) {
-      setErrorMessage('Ingrese el folio de la factura.');
+    const errorLineas = validarLineas(lineas, insumosDisponibles);
+    if (errorLineas) {
+      setErrorMessage(errorLineas);
       return;
-    }
-
-    const totalNum = parseFloat(totalPagado);
-    if (isNaN(totalNum) || totalNum <= 0) {
-      setErrorMessage('Ingrese un total pagado válido mayor a 0.');
-      return;
-    }
-
-    if (Math.abs(totalNum - totalCalculado) > 0.01) {
-      setErrorMessage(
-        `El total pagado ($${totalNum.toFixed(2)}) no coincide con la suma calculada de las líneas ($${totalCalculado.toFixed(2)}).`
-      );
-      return;
-    }
-
-    for (const linea of lineas) {
-      if (!linea.idProducto) {
-        setErrorMessage('Seleccione un insumo válido para cada línea.');
-        return;
-      }
-      if (linea.cantidad <= 0) {
-        setErrorMessage('La cantidad debe ser mayor a 0 en todas las líneas.');
-        return;
-      }
-      if (linea.costoUnitario < 0) {
-        setErrorMessage('El costo unitario no puede ser negativo.');
-        return;
-      }
-
-      const prod = insumosDisponibles.find((p) => p.idProducto === linea.idProducto);
-      if (prod && linea.costoUnitario > prod.precioVenta) {
-        setErrorMessage(
-          `El costo ($${linea.costoUnitario.toFixed(2)}) de '${prod.producto}' excede su precio de venta ($${prod.precioVenta.toFixed(2)}). Regla de protección de margen negativo.`
-        );
-        return;
-      }
     }
 
     setLoading(true);
@@ -167,7 +212,7 @@ export default function RegistrarEntradaModal({
       const payload: RegistrarEntradaDto = {
         idProveedor: Number(selectedProveedor),
         folioFactura: folioFactura.trim(),
-        totalPagado: totalNum,
+        totalPagado: validacionFactura.totalNum,
         lineas: lineas.map((l) => ({
           idProducto: l.idProducto,
           cantidad: l.cantidad,
@@ -176,8 +221,8 @@ export default function RegistrarEntradaModal({
       };
 
       await inventarioService.registrarEntrada(payload);
+      handleCloseModal();
       onSuccess();
-      onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al registrar la entrada';
       setErrorMessage(msg);
@@ -187,12 +232,7 @@ export default function RegistrarEntradaModal({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
       <div className="bg-[#141414] border border-[#262626] rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-[#f3f4f6]">
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#262626] flex items-center justify-between bg-[#111111]">
@@ -201,7 +241,7 @@ export default function RegistrarEntradaModal({
               <i className="fa-solid fa-truck-ramp-box text-lg" />
             </div>
             <div>
-              <h2 id="modal-title" className="text-lg font-bold text-white leading-tight">
+              <h2 className="text-lg font-bold text-white leading-tight">
                 Registrar Entrada de Mercancía
               </h2>
               <p className="text-xs text-[#a3a3a3]">
@@ -210,7 +250,7 @@ export default function RegistrarEntradaModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleCloseModal}
             className="text-[#737373] hover:text-white p-2 rounded-lg hover:bg-[#262626] transition-colors"
             aria-label="Cerrar modal"
           >
@@ -233,10 +273,14 @@ export default function RegistrarEntradaModal({
           {/* Encabezado de Factura */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-[#d4d4d4] mb-1.5 uppercase tracking-wider">
+              <label
+                htmlFor="select-proveedor"
+                className="block text-xs font-semibold text-[#d4d4d4] mb-1.5 uppercase tracking-wider"
+              >
                 Proveedor *
               </label>
               <select
+                id="select-proveedor"
                 value={selectedProveedor}
                 onChange={(e) => setSelectedProveedor(Number(e.target.value))}
                 className="w-full bg-[#1c1c1c] border border-[#262626] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#D81B60]"
@@ -251,10 +295,14 @@ export default function RegistrarEntradaModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#d4d4d4] mb-1.5 uppercase tracking-wider">
+              <label
+                htmlFor="input-folio-factura"
+                className="block text-xs font-semibold text-[#d4d4d4] mb-1.5 uppercase tracking-wider"
+              >
                 Folio de Factura *
               </label>
               <input
+                id="input-folio-factura"
                 type="text"
                 placeholder="ej. F-9021"
                 value={folioFactura}
@@ -268,9 +316,9 @@ export default function RegistrarEntradaModal({
           {/* Tabla de Insumos */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-[#d4d4d4] uppercase tracking-wider">
+              <span className="text-xs font-semibold text-[#d4d4d4] uppercase tracking-wider">
                 Líneas de Mercancía Recibida
-              </label>
+              </span>
               <button
                 type="button"
                 onClick={handleAddLinea}
@@ -281,7 +329,7 @@ export default function RegistrarEntradaModal({
             </div>
 
             <div className="space-y-3">
-              {lineas.map((linea, idx) => {
+              {lineas.map((linea) => {
                 const prod = insumosDisponibles.find((p) => p.idProducto === linea.idProducto);
                 const subtotal = (linea.cantidad || 0) * (linea.costoUnitario || 0);
                 const factor = prod?.factorEquivalencia || 1;
@@ -289,15 +337,19 @@ export default function RegistrarEntradaModal({
 
                 return (
                   <div
-                    key={idx}
+                    key={linea.keyId}
                     className="p-3.5 bg-[#181818] border border-[#262626] rounded-xl space-y-2.5"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1">
+                        <label htmlFor={`prod-${linea.keyId}`} className="sr-only">
+                          Insumo
+                        </label>
                         <select
+                          id={`prod-${linea.keyId}`}
                           value={linea.idProducto}
                           onChange={(e) =>
-                            handleLineaChange(idx, 'idProducto', Number(e.target.value))
+                            handleLineaChange(linea.keyId, 'idProducto', Number(e.target.value))
                           }
                           className="w-full bg-[#202020] border border-[#333333] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#D81B60]"
                         >
@@ -310,7 +362,7 @@ export default function RegistrarEntradaModal({
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleRemoveLinea(idx)}
+                        onClick={() => handleRemoveLinea(linea.keyId)}
                         className="text-[#737373] hover:text-red-400 p-1.5 transition-colors"
                         title="Eliminar línea"
                       >
@@ -320,31 +372,47 @@ export default function RegistrarEntradaModal({
 
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <span className="text-[10px] text-[#888888] block mb-1">
+                        <label
+                          htmlFor={`cant-${linea.keyId}`}
+                          className="text-[10px] text-[#888888] block mb-1"
+                        >
                           Cantidad (Factura)
-                        </span>
+                        </label>
                         <input
+                          id={`cant-${linea.keyId}`}
                           type="number"
                           min="1"
                           value={linea.cantidad}
                           onChange={(e) =>
-                            handleLineaChange(idx, 'cantidad', Math.max(1, parseInt(e.target.value) || 1))
+                            handleLineaChange(
+                              linea.keyId,
+                              'cantidad',
+                              Math.max(1, Number.parseInt(e.target.value, 10) || 1)
+                            )
                           }
                           className="w-full bg-[#202020] border border-[#333333] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#D81B60]"
                         />
                       </div>
 
                       <div>
-                        <span className="text-[10px] text-[#888888] block mb-1">
+                        <label
+                          htmlFor={`costo-${linea.keyId}`}
+                          className="text-[10px] text-[#888888] block mb-1"
+                        >
                           Costo Unitario ($)
-                        </span>
+                        </label>
                         <input
+                          id={`costo-${linea.keyId}`}
                           type="number"
                           step="0.01"
                           min="0"
                           value={linea.costoUnitario}
                           onChange={(e) =>
-                            handleLineaChange(idx, 'costoUnitario', parseFloat(e.target.value) || 0)
+                            handleLineaChange(
+                              linea.keyId,
+                              'costoUnitario',
+                              Number.parseFloat(e.target.value) || 0
+                            )
                           }
                           className="w-full bg-[#202020] border border-[#333333] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#D81B60]"
                         />
@@ -386,8 +454,14 @@ export default function RegistrarEntradaModal({
             </div>
 
             <div className="flex items-center gap-2 w-full md:w-auto">
-              <span className="text-xs font-semibold uppercase text-[#d4d4d4]">Total Pagado ($):</span>
+              <label
+                htmlFor="input-total-pagado"
+                className="text-xs font-semibold uppercase text-[#d4d4d4]"
+              >
+                Total Pagado ($):
+              </label>
               <input
+                id="input-total-pagado"
                 type="number"
                 step="0.01"
                 min="0.01"
@@ -404,7 +478,7 @@ export default function RegistrarEntradaModal({
           <div className="pt-2 flex items-center justify-end gap-3 border-t border-[#262626]">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleCloseModal}
               disabled={loading}
               className="px-4 py-2.5 rounded-xl border border-[#333333] text-sm text-[#a3a3a3] hover:text-white hover:bg-[#202020] transition-colors"
             >

@@ -7,12 +7,37 @@ import FinancialDashboardView from '@/components/pos/FinancialDashboardView';
 import CarteleraAdminView from '@/components/pos/CarteleraAdminView';
 import InventarioAdminView from '@/components/pos/InventarioAdminView';
 
+type TabType = 'finanzas' | 'cartelera' | 'inventario';
+
+function getHeaderTitle(tab: TabType): string {
+  if (tab === 'finanzas') return 'Módulo Administrativo • Dashboard Financiero';
+  if (tab === 'cartelera') return 'Módulo de Cartelera • Sincronización TMDB';
+  return 'Módulo Administrativo • Inventario Maestro y Entradas';
+}
+
+function getHeaderTag(tab: TabType): string {
+  if (tab === 'finanzas') return 'Finanzas';
+  if (tab === 'cartelera') return 'Catálogo';
+  return 'HU-11';
+}
+
+function renderTabContent(tab: TabType) {
+  if (tab === 'finanzas') return <FinancialDashboardView />;
+  if (tab === 'cartelera') return <CarteleraAdminView />;
+  return <InventarioAdminView />;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'finanzas' | 'cartelera' | 'inventario'>('finanzas');
+  const [activeTab, setActiveTab] = useState<TabType>('finanzas');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [userName, setUserName] = useState<string>('Administrador');
+  const [userName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return authService.getUserSession()?.nombre || 'Administrador';
+    }
+    return 'Administrador';
+  });
 
   // 1. Verificación de sesión y restricción estricta de Administrador 
   useEffect(() => {
@@ -25,10 +50,6 @@ export default function DashboardPage() {
     if (!rolLower.includes('admin')) {
       // Acceso estrictamente restringido a rol Administrador
       router.push('/pos');
-      return;
-    }
-    if (session.nombre) {
-      setUserName(session.nombre);
     }
   }, [router]);
 
@@ -188,14 +209,10 @@ export default function DashboardPage() {
             </button>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-white">
-                {activeTab === 'finanzas'
-                  ? 'Módulo Administrativo • Dashboard Financiero'
-                  : activeTab === 'cartelera'
-                  ? 'Módulo de Cartelera • Sincronización TMDB'
-                  : 'Módulo Administrativo • Inventario Maestro y Entradas'}
+                {getHeaderTitle(activeTab)}
               </span>
               <span className="hidden sm:inline-block text-[10px] bg-[#1a1a1a] text-[#a3a3a3] border border-[#333] px-2 py-0.5 rounded font-mono">
-                {activeTab === 'finanzas' ? 'Finanzas' : activeTab === 'cartelera' ? 'Catálogo' : 'HU-11'}
+                {getHeaderTag(activeTab)}
               </span>
             </div>
           </div>
@@ -203,13 +220,7 @@ export default function DashboardPage() {
 
         {/* Módulo Principal */}
         <div className="flex-grow overflow-y-auto p-4 sm:p-6 md:p-8 space-y-8">
-          {activeTab === 'finanzas' ? (
-            <FinancialDashboardView />
-          ) : activeTab === 'cartelera' ? (
-            <CarteleraAdminView />
-          ) : (
-            <InventarioAdminView />
-          )}
+          {renderTabContent(activeTab)}
         </div>
       </main>
     </div>
