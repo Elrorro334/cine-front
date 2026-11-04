@@ -643,7 +643,6 @@ export default function PosPage() {
                   <div className="flex items-center gap-2 w-full md:w-80">
                     <input
                       type="text"
-                      autoFocus
                       value={skuInput}
                       onChange={(e) => setSkuInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -764,14 +763,12 @@ export default function PosPage() {
                       {productosFiltrados.map((item: ProductoDto) => {
                         const agotado = item.stock <= 0;
                         return (
-                          <div
+                          <button
                             key={item.idProducto}
-                            onClick={() => {
-                              if (!agotado) {
-                                void handleAgregarProductoDulceria(item, 1);
-                              }
-                            }}
-                            className={`relative bg-[#111111] border border-[#262626] rounded-xl p-3 flex flex-col justify-between transition ${
+                            type="button"
+                            disabled={agotado}
+                            onClick={() => void handleAgregarProductoDulceria(item, 1)}
+                            className={`relative bg-[#111111] border border-[#262626] rounded-xl p-3 flex flex-col justify-between text-center transition ${
                               agotado
                                 ? 'opacity-50 cursor-not-allowed'
                                 : 'hover:border-[#F57C00] cursor-pointer'
@@ -789,7 +786,7 @@ export default function PosPage() {
                               />
                             )}
 
-                            <div className="text-center mt-1">
+                            <div className="text-center mt-1 w-full">
                               <h4 className="font-black text-white uppercase text-xs line-clamp-1">
                                 {item.nombre}
                               </h4>
@@ -805,21 +802,13 @@ export default function PosPage() {
                               </p>
                             </div>
 
-                            <div className="mt-2 pt-2 border-t border-[#262626] flex items-center justify-center">
-                              <button
-                                type="button"
-                                disabled={agotado}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void handleAgregarProductoDulceria(item, 1);
-                                }}
-                                className="w-full bg-[#050505] hover:bg-[#F57C00] text-white px-2.5 py-1 rounded-lg border border-[#262626] hover:border-[#F57C00] text-[11px] font-bold uppercase transition disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                              >
+                            <div className="mt-2 pt-2 border-t border-[#262626] flex items-center justify-center w-full">
+                              <span className="w-full bg-[#050505] hover:bg-[#F57C00] text-white px-2.5 py-1 rounded-lg border border-[#262626] hover:border-[#F57C00] text-[11px] font-bold uppercase transition flex items-center justify-center gap-1">
                                 <i className="fa-solid fa-plus text-[10px]" />
                                 <span>{agotado ? 'Agotado' : 'Agregar'}</span>
-                              </button>
+                              </span>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
