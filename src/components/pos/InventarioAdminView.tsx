@@ -158,6 +158,201 @@ export default function InventarioAdminView() {
     previewMargen = Number((((previewPrecio - previewCosto) / previewPrecio) * 100).toFixed(2));
   }
 
+  const renderInsumosBody = () => {
+    if (loading) {
+      return (
+        <tr>
+          <td colSpan={9} className="py-12 text-center text-[#737373]">
+            <i className="fa-solid fa-spinner fa-spin text-xl text-[#D81B60] mb-2" />
+            <p>Cargando inventario maestro...</p>
+          </td>
+        </tr>
+      );
+    }
+
+    if (insumos.length === 0) {
+      return (
+        <tr>
+          <td colSpan={9} className="py-10 text-center text-[#737373]">
+            No se encontraron insumos con los filtros seleccionados.
+          </td>
+        </tr>
+      );
+    }
+
+    return insumos.map((item) => (
+      <tr
+        key={item.idProducto}
+        className={`transition-colors ${
+          item.enAlerta
+            ? 'bg-amber-950/20 hover:bg-amber-950/30 border-l-4 border-l-amber-500'
+            : 'hover:bg-[#161616]'
+        }`}
+      >
+        <td className="py-3 px-4 font-mono text-[#d4d4d4] font-semibold">
+          {item.sku}
+        </td>
+        <td className="py-3 px-4 text-white font-medium">
+          <div className="flex items-center gap-2">
+            <i className={`fa-solid ${item.icono} text-[#a3a3a3] text-xs`} />
+            <span>{item.producto}</span>
+          </div>
+          {item.factorEquivalencia > 1 && (
+            <span className="text-[10px] text-amber-400 block mt-0.5">
+              Fraccionado: 1 unid = {item.factorEquivalencia} piezas en POS
+            </span>
+          )}
+        </td>
+        <td className="py-3 px-4">
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#222222] text-[#d4d4d4] border border-[#333333]">
+            {item.categoria}
+          </span>
+        </td>
+        <td className="py-3 px-4 text-center font-mono">
+          <div className="flex flex-col items-center">
+            <span
+              className={`font-bold text-sm ${
+                item.enAlerta ? 'text-amber-400' : 'text-white'
+              }`}
+            >
+              {item.stockActual}
+            </span>
+            {item.enAlerta && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1 mt-1">
+                <i className="fa-solid fa-triangle-exclamation text-[8px]" /> Desabasto
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="py-3 px-4 text-center font-mono text-[#a3a3a3]">
+          {item.minimoAlerta}
+        </td>
+        <td className="py-3 px-4 text-right font-mono text-[#a3a3a3]">
+          ${item.costoUnitario.toFixed(2)}
+        </td>
+        <td className="py-3 px-4 text-right font-mono text-white font-semibold">
+          ${item.precioVenta.toFixed(2)}
+        </td>
+        <td className="py-3 px-4 text-center font-mono">
+          <span className={`px-2 py-1 rounded-md text-xs font-bold ${getMargenBadgeClass(item.margenPorcentaje)}`}>
+            {item.margenPorcentaje.toFixed(2)}%
+          </span>
+        </td>
+        <td className="py-3 px-4 text-center">
+          <button
+            onClick={() => handleOpenEdit(item)}
+            className="px-2.5 py-1 rounded-lg bg-[#222222] hover:bg-[#333333] text-[#d4d4d4] hover:text-white transition-colors text-xs font-medium"
+            title="Editar Costo y Precio de Venta (Criterio 3)"
+          >
+            <i className="fa-solid fa-pen-to-square text-xs mr-1" /> Editar
+          </button>
+        </td>
+      </tr>
+    ));
+  };
+
+  const renderEntradasBody = () => {
+    if (loading) {
+      return (
+        <tr>
+          <td colSpan={5} className="py-8 text-center text-[#737373]">
+            Cargando historial de facturas...
+          </td>
+        </tr>
+      );
+    }
+
+    if (entradas.length === 0) {
+      return (
+        <tr>
+          <td colSpan={5} className="py-8 text-center text-[#737373]">
+            No hay entradas de mercancía registradas aún.
+          </td>
+        </tr>
+      );
+    }
+
+    return entradas.map((entrada) => (
+      <React.Fragment key={entrada.idFactura}>
+        <tr className="hover:bg-[#161616] transition-colors">
+          <td className="py-3.5 px-4 font-semibold text-white">
+            <div className="flex items-center gap-2">
+              <i className="fa-solid fa-building text-[#737373] text-xs" />
+              <span>{entrada.proveedor}</span>
+            </div>
+          </td>
+          <td className="py-3.5 px-4 font-mono text-[#D81B60] font-bold">
+            {entrada.factura}
+          </td>
+          <td className="py-3.5 px-4 text-right font-mono font-bold text-white text-sm">
+            ${entrada.totalPagado.toFixed(2)}
+          </td>
+          <td className="py-3.5 px-4 text-center text-[#a3a3a3] font-mono">
+            {new Date(entrada.fechaRegistro).toLocaleDateString('es-MX', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </td>
+          <td className="py-3.5 px-4 text-center">
+            <button
+              onClick={() =>
+                setExpandedFacturaId(
+                  expandedFacturaId === entrada.idFactura
+                    ? null
+                    : entrada.idFactura
+                )
+              }
+              className="text-[#a3a3a3] hover:text-white px-2 py-1 rounded bg-[#1c1c1c] text-xs font-medium"
+            >
+              <i className={`fa-solid ${getExpandIcon(expandedFacturaId === entrada.idFactura)} mr-1`} />
+              {getExpandText(expandedFacturaId === entrada.idFactura)}
+            </button>
+          </td>
+        </tr>
+        {expandedFacturaId === entrada.idFactura && (
+          <tr className="bg-[#0e0e0e]">
+            <td colSpan={5} className="p-4">
+              <div className="bg-[#141414] rounded-xl p-3 border border-[#222222] space-y-2">
+                <span className="text-[11px] font-bold text-[#d4d4d4] uppercase tracking-wider block">
+                  Insumos ingresados con folio {entrada.factura}:
+                </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {entrada.lineas.map((linea) => (
+                    <div
+                      key={linea.idEntrada}
+                      className="p-2.5 bg-[#1b1b1b] rounded-lg border border-[#2a2a2a] text-xs flex justify-between items-center"
+                    >
+                      <div>
+                        <div className="font-semibold text-white">
+                          {linea.producto}
+                        </div>
+                        <div className="text-[10px] text-[#888888]">
+                          Comprado: {linea.cantidadComprada} unid. | Costo: $
+                          {linea.costoUnitario.toFixed(2)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="px-2 py-0.5 rounded bg-[#D81B60]/10 text-[#D81B60] text-[10px] font-bold border border-[#D81B60]/20">
+                          +{linea.cantidadStockAgregada} stock
+                        </span>
+                        <div className="font-mono text-[11px] text-[#a3a3a3] mt-0.5">
+                          Subtotal: ${linea.costoTotal.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </td>
+          </tr>
+        )}
+      </React.Fragment>
+    ));
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-y-auto bg-[#0a0a0a] text-[#f3f4f6] p-6 lg:p-8 space-y-8">
       {/* Encabezado y Acción Principal */}
@@ -254,107 +449,7 @@ export default function InventarioAdminView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#202020]">
-                {loading ? (
-                  <tr>
-                    <td colSpan={9} className="py-12 text-center text-[#737373]">
-                      <i className="fa-solid fa-spinner fa-spin text-xl text-[#D81B60] mb-2" />
-                      <p>Cargando inventario maestro...</p>
-                    </td>
-                  </tr>
-                ) : insumos.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="py-10 text-center text-[#737373]">
-                      No se encontraron insumos con los filtros seleccionados.
-                    </td>
-                  </tr>
-                ) : (
-                  insumos.map((item) => (
-                    <tr
-                      key={item.idProducto}
-                      className={`transition-colors ${
-                        item.enAlerta
-                          ? 'bg-amber-950/20 hover:bg-amber-950/30 border-l-4 border-l-amber-500'
-                          : 'hover:bg-[#161616]'
-                      }`}
-                    >
-                      {/* 1. SKU */}
-                      <td className="py-3 px-4 font-mono text-[#d4d4d4] font-semibold">
-                        {item.sku}
-                      </td>
-
-                      {/* 2. Producto */}
-                      <td className="py-3 px-4 text-white font-medium">
-                        <div className="flex items-center gap-2">
-                          <i className={`fa-solid ${item.icono} text-[#a3a3a3] text-xs`} />
-                          <span>{item.producto}</span>
-                        </div>
-                        {item.factorEquivalencia > 1 && (
-                          <span className="text-[10px] text-amber-400 block mt-0.5">
-                            Fraccionado: 1 unid = {item.factorEquivalencia} piezas en POS
-                          </span>
-                        )}
-                      </td>
-
-                      {/* 3. Categoría */}
-                      <td className="py-3 px-4">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#222222] text-[#d4d4d4] border border-[#333333]">
-                          {item.categoria}
-                        </span>
-                      </td>
-
-                      {/* 4. Stock Actual con Alerta Criterio 1 */}
-                      <td className="py-3 px-4 text-center font-mono">
-                        <div className="flex flex-col items-center">
-                          <span
-                            className={`font-bold text-sm ${
-                              item.enAlerta ? 'text-amber-400' : 'text-white'
-                            }`}
-                          >
-                            {item.stockActual}
-                          </span>
-                          {item.enAlerta && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1 mt-1">
-                              <i className="fa-solid fa-triangle-exclamation text-[8px]" /> Desabasto
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* 5. Mínimo de Alerta */}
-                      <td className="py-3 px-4 text-center font-mono text-[#a3a3a3]">
-                        {item.minimoAlerta}
-                      </td>
-
-                      {/* 6. Costo Unitario */}
-                      <td className="py-3 px-4 text-right font-mono text-[#a3a3a3]">
-                        ${item.costoUnitario.toFixed(2)}
-                      </td>
-
-                      {/* 7. Precio de Venta */}
-                      <td className="py-3 px-4 text-right font-mono text-white font-semibold">
-                        ${item.precioVenta.toFixed(2)}
-                      </td>
-
-                      {/* 8. Margen (%) Recalculado */}
-                      <td className="py-3 px-4 text-center font-mono">
-                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${getMargenBadgeClass(item.margenPorcentaje)}`}>
-                          {item.margenPorcentaje.toFixed(2)}%
-                        </span>
-                      </td>
-
-                      {/* Acciones (Criterio 3: Editar Precios) */}
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => handleOpenEdit(item)}
-                          className="px-2.5 py-1 rounded-lg bg-[#222222] hover:bg-[#333333] text-[#d4d4d4] hover:text-white transition-colors text-xs font-medium"
-                          title="Editar Costo y Precio de Venta (Criterio 3)"
-                        >
-                          <i className="fa-solid fa-pen-to-square text-xs mr-1" /> Editar
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                {renderInsumosBody()}
               </tbody>
             </table>
           </div>
@@ -388,110 +483,7 @@ export default function InventarioAdminView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#202020]">
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-[#737373]">
-                      Cargando historial de facturas...
-                    </td>
-                  </tr>
-                ) : entradas.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-[#737373]">
-                      No hay entradas de mercancía registradas aún.
-                    </td>
-                  </tr>
-                ) : (
-                  entradas.map((entrada) => (
-                    <React.Fragment key={entrada.idFactura}>
-                      <tr className="hover:bg-[#161616] transition-colors">
-                        {/* 1. Proveedor */}
-                        <td className="py-3.5 px-4 font-semibold text-white">
-                          <div className="flex items-center gap-2">
-                            <i className="fa-solid fa-building text-[#737373] text-xs" />
-                            <span>{entrada.proveedor}</span>
-                          </div>
-                        </td>
-
-                        {/* 2. Factura */}
-                        <td className="py-3.5 px-4 font-mono text-[#D81B60] font-bold">
-                          {entrada.factura}
-                        </td>
-
-                        {/* 3. Total Pagado */}
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-white text-sm">
-                          ${entrada.totalPagado.toFixed(2)}
-                        </td>
-
-                        {/* Fecha */}
-                        <td className="py-3.5 px-4 text-center text-[#a3a3a3] font-mono">
-                          {new Date(entrada.fechaRegistro).toLocaleDateString('es-MX', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </td>
-
-                        {/* Toggle detalles */}
-                        <td className="py-3.5 px-4 text-center">
-                          <button
-                            onClick={() =>
-                              setExpandedFacturaId(
-                                expandedFacturaId === entrada.idFactura
-                                  ? null
-                                  : entrada.idFactura
-                              )
-                            }
-                            className="text-[#a3a3a3] hover:text-white px-2 py-1 rounded bg-[#1c1c1c] text-xs font-medium"
-                          >
-                            <i className={`fa-solid ${getExpandIcon(expandedFacturaId === entrada.idFactura)} mr-1`} />
-                            {getExpandText(expandedFacturaId === entrada.idFactura)}
-                          </button>
-                        </td>
-                      </tr>
-
-                      {/* Fila expandible con las líneas de entrada de la factura */}
-                      {expandedFacturaId === entrada.idFactura && (
-                        <tr className="bg-[#0e0e0e]">
-                          <td colSpan={5} className="p-4">
-                            <div className="bg-[#141414] rounded-xl p-3 border border-[#222222] space-y-2">
-                              <span className="text-[11px] font-bold text-[#d4d4d4] uppercase tracking-wider block">
-                                Insumos ingresados con folio {entrada.factura}:
-                              </span>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {entrada.lineas.map((linea) => (
-                                  <div
-                                    key={linea.idEntrada}
-                                    className="p-2.5 bg-[#1b1b1b] rounded-lg border border-[#2a2a2a] text-xs flex justify-between items-center"
-                                  >
-                                    <div>
-                                      <div className="font-semibold text-white">
-                                        {linea.producto}
-                                      </div>
-                                      <div className="text-[10px] text-[#888888]">
-                                        Comprado: {linea.cantidadComprada} unid. | Costo: $
-                                        {linea.costoUnitario.toFixed(2)}
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <span className="px-2 py-0.5 rounded bg-[#D81B60]/10 text-[#D81B60] text-[10px] font-bold border border-[#D81B60]/20">
-                                        +{linea.cantidadStockAgregada} stock
-                                      </span>
-                                      <div className="font-mono text-[11px] text-[#a3a3a3] mt-0.5">
-                                        Subtotal: ${linea.costoTotal.toFixed(2)}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))
-                )}
+                {renderEntradasBody()}
               </tbody>
             </table>
           </div>
