@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+﻿import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import SeatMapModal from './SeatMapModal';
 import { taquillaService } from '@/services/taquillaService';
 
@@ -56,19 +56,19 @@ describe('SeatMapModal Component', () => {
     expect(screen.getByText('Spider-Man')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: '1' }).length).toBeGreaterThan(0);
+      expect(screen.getByRole('button', { name: 'Butaca A1' })).toBeInTheDocument();
     });
 
-    const buttonsNumber1 = screen.getAllByRole('button', { name: '1' });
+    const butacaA1 = screen.getByRole('button', { name: 'Butaca A1' });
     // Seleccionar A1
-    fireEvent.click(buttonsNumber1[0]);
+    fireEvent.click(butacaA1);
     expect(screen.getByText('A1')).toBeInTheDocument();
 
     // Deseleccionar A1 y volver a seleccionar
-    fireEvent.click(buttonsNumber1[0]);
+    fireEvent.click(butacaA1);
     expect(screen.getByText('Ninguna')).toBeInTheDocument();
 
-    fireEvent.click(buttonsNumber1[0]);
+    fireEvent.click(butacaA1);
 
     // Confirmar selección
     const confirmBtn = screen.getByRole('button', { name: /Agregar a Venta/i });
@@ -91,7 +91,7 @@ describe('SeatMapModal Component', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: '1' }).length).toBeGreaterThan(0);
+      expect(screen.getByRole('button', { name: 'Butaca A1' })).toBeInTheDocument();
     });
 
     const autoBtn = screen.getByRole('button', { name: /Asignar Auto/i });
