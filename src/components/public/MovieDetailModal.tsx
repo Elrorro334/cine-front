@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Movie } from '@/types/cartelera';
+import { carteleraService } from '@/services/carteleraService';
 
 interface MovieDetailModalProps {
   readonly movie: Movie | null;
@@ -10,23 +12,28 @@ interface MovieDetailModalProps {
 }
 
 export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetailModalProps) {
-  const [selectedHorario, setSelectedHorario] = useState<string | null>(null);
+  const router = useRouter();
+  const [selectedHorarioOverride, setSelectedHorarioOverride] = useState<string | null>(null);
+  const [isTrailerOpen, setIsTrailerOpen] = useState(false);
+  const [selectedTrailerKey, setSelectedTrailerKey] = useState<string | null>(null);
+  const [loadingTrailer, setLoadingTrailer] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      if (movie && movie.showtimes.length > 0) {
-        setSelectedHorario(movie.showtimes[0]);
-      } else {
-        setSelectedHorario(null);
-      }
     } else {
       document.body.style.overflow = 'unset';
+      setIsTrailerOpen(false);
+      setSelectedTrailerKey(null);
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (isTrailerOpen) {
+          setIsTrailerOpen(false);
+        } else {
+          onClose();
+        }
       }
     };
 
@@ -35,21 +42,51 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
       document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, movie, onClose]);
+  }, [isOpen, onClose, isTrailerOpen]);
 
   if (!isOpen || !movie) return null;
+
+  const defaultHorario = movie.showtimes.length > 0 ? movie.showtimes[0] : null;
+  const selectedHorario = selectedHorarioOverride ?? defaultHorario;
 
   const selectedFuncion = movie.funciones?.find((f) => f.hora === selectedHorario) ?? movie.funciones?.[0];
   const precioDisplay = selectedFuncion ? selectedFuncion.precio : 50;
   const salaDisplay = selectedFuncion?.nombreSala || 'Sala Principal';
 
+  const handleGenerarPreorden = () => {
+    setIsTrailerOpen(false);
+    onClose();
+    const horarioParam = selectedHorario ? `&horario=${encodeURIComponent(selectedHorario)}` : '';
+    router.push(`/preorden?peli=${movie.id}${horarioParam}`);
+  };
+
+  const handleVerTrailer = async () => {
+    setIsTrailerOpen(true);
+    setLoadingTrailer(true);
+    try {
+      const data = await carteleraService.obtenerTrailer(movie.id);
+      if (data && data.trailerKey) {
+        setSelectedTrailerKey(data.trailerKey);
+      } else if (movie.trailerKey) {
+        setSelectedTrailerKey(movie.trailerKey);
+      }
+    } catch {
+      if (movie.trailerKey) {
+        setSelectedTrailerKey(movie.trailerKey);
+      }
+    } finally {
+      setLoadingTrailer(false);
+    }
+  };
+
   return (
-    <dialog
-      open
-      aria-modal="true"
-      aria-labelledby="movie-modal-title"
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#0A0A0A]/95 backdrop-blur-md transition-opacity duration-300 border-none m-0 max-w-none max-h-none w-full h-full"
-    >
+    <>
+      <dialog
+        open
+        aria-modal="true"
+        aria-labelledby="movie-modal-title"
+        className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#0A0A0A]/95 backdrop-blur-md transition-opacity duration-300 border-none m-0 max-w-none max-h-none w-full h-full"
+      >
       {/* Backdrop click to close */}
       <button
         type="button"
@@ -128,7 +165,7 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
                     <button
                       key={hora}
                       type="button"
-                      onClick={() => setSelectedHorario(hora)}
+                      onClick={() => setSelectedHorarioOverride(hora)}
                       className={`px-4 py-2 rounded-xl font-mono text-xs font-bold uppercase transition-all ${
                         isSelected
                           ? 'bg-[#E11D2F] text-white shadow-lg shadow-[#E11D2F]/30 scale-105'
@@ -171,18 +208,131 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
             </div>
           </div>
 
-          {/* Botón de Acción */}
-          <div className="mt-auto pt-4 border-t border-[#262626]">
+          {/* Botones de Acción (Captura 1: Generar Pre-Orden y Ver Tráiler) */}
+          <div className="mt-auto pt-4 border-t border-[#262626] flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <button
               type="button"
-              onClick={onClose}
-              className="w-full bg-gradient-to-r from-[#E11D2F] to-red-700 text-white px-5 py-3.5 rounded-xl font-sans font-black text-xs uppercase tracking-widest hover:scale-[1.02] hover:shadow-[0_0_25px_rgba(225,29,47,0.45)] transition-all flex items-center justify-center gap-2 text-center leading-tight shadow-lg"
+              onClick={handleGenerarPreorden}
+              className="flex-1 bg-[#E11D2F] hover:bg-[#c81928] text-white py-3.5 px-4 rounded-xl font-sans font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-[#E11D2F]/40 hover:scale-[1.01]"
             >
-              <span>Entendido • Regresar a Cartelera</span>
+              <i className="fa-solid fa-qrcode text-sm" />
+              <span>Generar Pre-Orden (Ticket QR)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleVerTrailer}
+              className="bg-[#161616] hover:bg-[#222222] border border-[#333333] hover:border-neutral-500 text-white py-3.5 px-5 rounded-xl font-sans font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+            >
+              <i className="fa-brands fa-youtube text-red-500 text-base" />
+              <span>Ver Tráiler</span>
             </button>
           </div>
         </div>
       </div>
     </dialog>
+
+    {/* ==========================================================
+         MODAL REPRODUCTOR DE TRÁILER INTEGRADO EN LA PÁGINA
+         ========================================================== */}
+    {isTrailerOpen && (
+      <dialog
+        open
+        aria-modal="true"
+        aria-labelledby="trailer-modal-title"
+        className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-5 bg-black/95 backdrop-blur-xl border-none m-0 max-w-none max-h-none w-full h-full"
+      >
+        {/* Backdrop click to close trailer */}
+        <button
+          type="button"
+          aria-label="Cerrar reproductor"
+          onClick={() => setIsTrailerOpen(false)}
+          className="fixed inset-0 bg-transparent cursor-default w-full h-full border-none p-0 -z-10 focus:outline-none"
+        />
+
+        <div className="bg-[#121212] border border-[#262626] rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-y-auto relative shadow-2xl flex flex-col p-4 sm:p-6 space-y-4">
+          {/* Cabecera del reproductor */}
+          <div className="flex items-center justify-between border-b border-[#262626] pb-3">
+            <div className="pr-4">
+              <span className="text-[10px] font-bold text-[#E11D2F] uppercase tracking-[0.25em] flex items-center gap-1.5 mb-1">
+                <i className="fa-solid fa-film text-xs" /> Sala Virtual Xilotzin
+              </span>
+              <h3
+                id="trailer-modal-title"
+                className="text-lg sm:text-2xl font-['Playfair_Display',serif] font-black uppercase text-white truncate"
+              >
+                Tráiler de {movie.title}
+              </h3>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsTrailerOpen(false)}
+              className="w-9 h-9 sm:w-10 sm:h-10 bg-[#0A0A0A] hover:bg-[#E11D2F] text-white rounded-full flex items-center justify-center transition-colors border border-[#262626] shrink-0 text-sm cursor-pointer shadow-md"
+              aria-label="Cerrar tráiler"
+            >
+              <i className="fa-solid fa-xmark text-base" />
+            </button>
+          </div>
+
+          {/* Contenedor del Video en Proporción 16:9 */}
+          <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-[#262626] flex items-center justify-center">
+            {loadingTrailer ? (
+              <div className="flex flex-col items-center justify-center text-white space-y-3 p-6 text-center">
+                <i className="fa-solid fa-spinner fa-spin text-2xl text-[#E11D2F]" />
+                <span className="text-xs uppercase font-mono tracking-widest text-[#A0A0A0]">
+                  Cargando tráiler oficial de {movie.title}...
+                </span>
+              </div>
+            ) : selectedTrailerKey ? (
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${selectedTrailerKey}?autoplay=1&rel=0&modestbranding=1`}
+                title={`Tráiler de ${movie.title}`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                className="w-full h-full border-0 absolute inset-0"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center text-white space-y-2 p-6 text-center">
+                <i className="fa-solid fa-triangle-exclamation text-2xl text-[#DCA54C]" />
+                <p className="text-sm font-bold">No hay tráiler disponible para esta función</p>
+                <p className="text-xs text-[#A0A0A0]">Consulta horarios y disponibilidad en taquilla física.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Pie del Reproductor con Acciones Rápidas */}
+          <div className="pt-3 border-t border-[#262626] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="text-xs text-[#A0A0A0] font-sans flex items-center gap-2">
+              <span className="bg-[#0A0A0A] px-2.5 py-1 rounded border border-[#262626] font-bold text-white uppercase text-[10px]">
+                {movie.duration}
+              </span>
+              <span className="bg-[#0A0A0A] px-2.5 py-1 rounded border border-[#262626] font-bold text-white uppercase text-[10px]">
+                Clasif. {movie.classification}
+              </span>
+              <span>Proyección en {salaDisplay}</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsTrailerOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-[#0A0A0A] hover:bg-[#1a1a1a] text-[#A0A0A0] hover:text-white text-xs font-bold uppercase tracking-wider border border-[#262626] transition-colors cursor-pointer"
+              >
+                Volver a Detalles
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerarPreorden}
+                className="px-5 py-2.5 rounded-xl bg-[#E11D2F] hover:bg-[#c81928] text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg hover:shadow-[#E11D2F]/40 cursor-pointer"
+              >
+                <i className="fa-solid fa-qrcode" />
+                <span>Generar Pre-Orden</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </dialog>
+    )}
+  </>
   );
 }

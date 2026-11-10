@@ -5,13 +5,39 @@ import { useRouter } from 'next/navigation';
 import { authService } from '@/services/authService';
 import FinancialDashboardView from '@/components/pos/FinancialDashboardView';
 import CarteleraAdminView from '@/components/pos/CarteleraAdminView';
+import InventarioAdminView from '@/components/pos/InventarioAdminView';
+
+type TabType = 'finanzas' | 'cartelera' | 'inventario';
+
+function getHeaderTitle(tab: TabType): string {
+  if (tab === 'finanzas') return 'Módulo Administrativo • Dashboard Financiero';
+  if (tab === 'cartelera') return 'Módulo de Cartelera • Sincronización TMDB';
+  return 'Módulo Administrativo • Inventario Maestro y Entradas';
+}
+
+function getHeaderTag(tab: TabType): string {
+  if (tab === 'finanzas') return 'Finanzas';
+  if (tab === 'cartelera') return 'Catálogo';
+  return 'HU-11';
+}
+
+function renderTabContent(tab: TabType) {
+  if (tab === 'finanzas') return <FinancialDashboardView />;
+  if (tab === 'cartelera') return <CarteleraAdminView />;
+  return <InventarioAdminView />;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'finanzas' | 'cartelera'>('finanzas');
+  const [activeTab, setActiveTab] = useState<TabType>('finanzas');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [userName, setUserName] = useState<string>('Administrador');
+  const [userName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return authService.getUserSession()?.nombre || 'Administrador';
+    }
+    return 'Administrador';
+  });
 
   // 1. Verificación de sesión y restricción estricta de Administrador 
   useEffect(() => {
@@ -24,10 +50,6 @@ export default function DashboardPage() {
     if (!rolLower.includes('admin')) {
       // Acceso estrictamente restringido a rol Administrador
       router.push('/pos');
-      return;
-    }
-    if (session.nombre) {
-      setUserName(session.nombre);
     }
   }, [router]);
 
@@ -116,6 +138,23 @@ export default function DashboardPage() {
             <span>Películas & Cartelera TMDB</span>
           </button>
 
+          {/* Módulo de Inventario Maestro y Registro de Entradas (HU-11) */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('inventario');
+              setIsSidebarOpen(false);
+            }}
+            className={`w-full text-left px-4 py-3 rounded-xl font-sans font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all ${
+              activeTab === 'inventario'
+                ? 'text-white bg-[#D81B60] shadow-[0_0_15px_rgba(216,27,96,0.3)]'
+                : 'text-[#a3a3a3] hover:text-white hover:bg-[#1a1a1a]'
+            }`}
+          >
+            <i className="fa-solid fa-boxes-stacked text-sm" />
+            <span>Inventario & Entradas</span>
+          </button>
+
           <div className="pt-4 mt-2 border-t border-[#262626]">
             <span className="px-4 text-[9px] font-mono uppercase text-[#737373] tracking-wider block mb-2">Accesos Rápidos</span>
             <button
@@ -170,28 +209,18 @@ export default function DashboardPage() {
             </button>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-white">
-                {activeTab === 'finanzas' ? 'Módulo Administrativo • Dashboard Financiero' : 'Módulo de Cartelera • Sincronización TMDB'}
+                {getHeaderTitle(activeTab)}
               </span>
               <span className="hidden sm:inline-block text-[10px] bg-[#1a1a1a] text-[#a3a3a3] border border-[#333] px-2 py-0.5 rounded font-mono">
-                {activeTab === 'finanzas' ? 'Finanzas' : 'Catálogo'}
+                {getHeaderTag(activeTab)}
               </span>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-2.5 py-1 rounded-full flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>SQL Server 2022 Conectado</span>
-            </span>
           </div>
         </header>
 
         {/* Módulo Principal */}
         <div className="flex-grow overflow-y-auto p-4 sm:p-6 md:p-8 space-y-8">
-          {activeTab === 'finanzas' ? (
-            <FinancialDashboardView />
-          ) : (
-            <CarteleraAdminView />
-          )}
+          {renderTabContent(activeTab)}
         </div>
       </main>
     </div>

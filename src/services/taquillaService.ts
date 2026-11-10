@@ -3,6 +3,9 @@ import {
   PeliculaCarteleraDto,
   FuncionButacasDto,
   ProductoDto,
+  CatalogoDulceriaPosDto,
+  CalcularOrdenRequestDto,
+  ResumenOrdenCalculadoDto,
   RegistrarVentaDto,
   VentaConfirmadaDto,
   PreordenDto,
@@ -29,6 +32,30 @@ export const taquillaService = {
    */
   async getProductosDulceria(): Promise<ProductoDto[]> {
     return apiFetch<ProductoDto[]>('/taquilla/dulceria');
+  },
+
+  /**
+   * HU-07: Obtiene el catálogo completo del POS Dulcería incluyendo el monitor de stock fraccionado de pizzas
+   */
+  async getCatalogoDulceriaPos(): Promise<CatalogoDulceriaPosDto> {
+    return apiFetch<CatalogoDulceriaPosDto>('/taquilla/dulceria/catalogo-pos');
+  },
+
+  /**
+   * HU-07: Busca un producto activo de dulcería por código de barras / SKU desde el lector óptico
+   */
+  async buscarProductoPorSku(sku: string): Promise<ProductoDto> {
+    return apiFetch<ProductoDto>(`/taquilla/dulceria/sku/${encodeURIComponent(sku)}`);
+  },
+
+  /**
+   * HU-07: Calcula en el servidor el resumen de venta y el monitor de stock fraccionado proyectado
+   */
+  async calcularOrdenPos(dto: CalcularOrdenRequestDto): Promise<ResumenOrdenCalculadoDto> {
+    return apiFetch<ResumenOrdenCalculadoDto>('/taquilla/dulceria/calcular-orden', {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
   },
 
   /**

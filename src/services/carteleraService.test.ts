@@ -204,4 +204,50 @@ describe('carteleraService', () => {
     const ok = await carteleraService.eliminarPelicula(50);
     expect(ok).toBe(true);
   });
+
+  test('crearPreorden envía POST a /cartelera/preorden y retorna el ticket', async () => {
+    const mockTicket = {
+      idPreorden: 1,
+      codigo: 'PRE-XIL-12345',
+      cliente: 'Carlos Méndez',
+      total: 100,
+    };
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockTicket,
+    });
+
+    const res = await carteleraService.crearPreorden({
+      idFuncion: 1,
+      boletos: 2,
+      nombreCliente: 'Carlos Méndez',
+      telefonoCliente: '5512345678',
+    });
+
+    expect(res.codigo).toBe('PRE-XIL-12345');
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/cartelera/preorden'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  test('obtenerPreorden consulta por código QR', async () => {
+    const mockTicket = {
+      idPreorden: 1,
+      codigo: 'PRE-XIL-99999',
+    };
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockTicket,
+    });
+
+    const res = await carteleraService.obtenerPreorden('PRE-XIL-99999');
+    expect(res.codigo).toBe('PRE-XIL-99999');
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/taquilla/preorden/PRE-XIL-99999'),
+      expect.any(Object)
+    );
+  });
 });
