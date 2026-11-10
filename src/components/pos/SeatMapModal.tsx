@@ -11,6 +11,7 @@ interface SeatMapModalProps {
   readonly horario: string;
   readonly idFuncion?: number;
   readonly precioBoleto?: number;
+  readonly requiredSeats?: number;
   readonly onConfirmSeats: (asientos: string[]) => void;
 }
 
@@ -31,6 +32,7 @@ export default function SeatMapModal({
   horario,
   idFuncion,
   precioBoleto = 50,
+  requiredSeats,
   onConfirmSeats,
 }: SeatMapModalProps) {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
@@ -75,14 +77,21 @@ export default function SeatMapModal({
   // Filas únicas derivadas directamente de la base de datos
   const filas = Array.from(new Set(butacas.map((b) => b.fila))).sort((a, b) => a.localeCompare(b));
 
+  const maxAllowed = requiredSeats ?? 8;
+  const cantidadAuto = requiredSeats ?? 1;
+
   const toggleAsiento = (asientoCodigo: string, estaOcupada: boolean) => {
     if (estaOcupada) return;
 
     if (selectedSeats.includes(asientoCodigo)) {
       setSelectedSeats(selectedSeats.filter((a) => a !== asientoCodigo));
     } else {
-      if (selectedSeats.length >= 8) {
-        alert('Máximo 8 boletos por selección.');
+      if (selectedSeats.length >= maxAllowed) {
+        if (requiredSeats) {
+          alert(`Esta pre-orden requiere exactamente ${requiredSeats} butaca${requiredSeats > 1 ? 's' : ''}.`);
+        } else {
+          alert('Máximo 8 boletos por selección.');
+        }
         return;
       }
       setSelectedSeats([...selectedSeats, asientoCodigo]);
@@ -90,14 +99,21 @@ export default function SeatMapModal({
   };
 
   const autoAsignar = () => {
-    const primeraLibre = butacas.find((b) => !b.estaOcupada && !selectedSeats.includes(b.codigo));
-    if (primeraLibre) {
-      setSelectedSeats([primeraLibre.codigo]);
+    const libres = butacas.filter((b) => !b.estaOcupada);
+    if (libres.length < cantidadAuto) {
+      alert('No hay suficientes butacas libres disponibles.');
+      return;
     }
+    const sugeridas = libres.slice(0, cantidadAuto).map((b) => b.codigo);
+    setSelectedSeats(sugeridas);
   };
 
+  const isConfirmDisabled = requiredSeats
+    ? selectedSeats.length !== requiredSeats
+    : selectedSeats.length === 0;
+
   const handleConfirm = () => {
-    if (selectedSeats.length === 0) return;
+    if (isConfirmDisabled) return;
     onConfirmSeats(selectedSeats);
     onClose();
   };
@@ -122,6 +138,13 @@ export default function SeatMapModal({
             <i className="fa-solid fa-xmark text-lg" />
           </button>
         </div>
+
+        {/* Notificación de canje de pre-orden si aplica */}
+        {requiredSeats && (
+          <div className="mt-3 bg-pink-950/40 border border-[#D81B60]/40 rounded-xl px-3 py-2 text-center text-xs text-pink-200 font-mono">
+            Canje de Pre-Orden: Selecciona exactamente <strong>{requiredSeats}</strong> butaca{requiredSeats > 1 ? 's' : ''} ({selectedSeats.length}/{requiredSeats})
+          </div>
+        )}
 
         {/* Representación Pantalla Curva */}
         <div className="my-4 text-center">
@@ -162,18 +185,21 @@ export default function SeatMapModal({
                   <span className="w-4 text-center font-mono font-bold text-xs text-[#a3a3a3]">
                     {fila}
                   </span>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
                     {butacasFila.map((b) => {
                       const isOcupado = b.estaOcupada;
                       const isSelected = selectedSeats.includes(b.codigo);
+                      // Pasillo central entre las butacas 4 y 5 según el Mockup 11
+                      const aisleClass = b.numero === 4 ? 'mr-3 sm:mr-4' : '';
 
                       return (
                         <button
                           key={b.codigo}
                           type="button"
+                          aria-label={`Butaca ${b.codigo}`}
                           disabled={isOcupado}
                           onClick={() => toggleAsiento(b.codigo, isOcupado)}
-                          className={`w-6 h-6 rounded font-mono text-[9px] font-bold transition-all ${getSeatButtonStyle(isOcupado, isSelected)}`}
+                          className={`w-6 h-6 rounded font-mono text-[9px] font-bold transition-all ${getSeatButtonStyle(isOcupado, isSelected)} ${aisleClass}`}
                         >
                           {b.numero}
                         </button>
@@ -208,11 +234,11 @@ export default function SeatMapModal({
               className="bg-[#050505] hover:bg-neutral-800 text-[#a3a3a3] hover:text-white border border-[#262626] py-2.5 px-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
             >
               <i className="fa-solid fa-bolt text-yellow-400 text-xs" />
-              <span>Asignar Auto (1)</span>
+              <span>Asignar Auto ({cantidadAuto})</span>
             </button>
             <button
               type="button"
-              disabled={selectedSeats.length === 0}
+              disabled={isConfirmDisabled}
               onClick={handleConfirm}
               className="bg-[#D81B60] hover:bg-pink-600 disabled:opacity-40 text-white py-2.5 px-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-1.5"
             >

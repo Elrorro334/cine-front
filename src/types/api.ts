@@ -105,6 +105,8 @@ export interface FuncionButacasDto {
   idFuncion: number;
   idSala: number;
   nombreSala: string;
+  peliculaTitulo?: string;
+  horario?: string;
   precio: number;
   butacas: ButacaDto[];
 }
@@ -117,6 +119,60 @@ export interface ProductoDto {
   precio: number;
   stock: number;
   img?: string;
+  esFraccionado?: boolean;
+  factorFraccion?: number;
+  descripcionDescuento?: string | null;
+}
+
+// DTOs de Dulcería POS y Stock Fraccionado (HU-07)
+export interface StockFraccionadoDto {
+  idStockFraccionado: number;
+  nombreInsumo: string;
+  stockRebanadasActual: number;
+  factorFraccion: number;
+  pizzasCompletasEquivalentes: number;
+  rebanadasSueltas: number;
+  etiquetaMonitor: string;
+  productoRebanada?: ProductoDto | null;
+  productoPizzaCompleta?: ProductoDto | null;
+}
+
+export interface CatalogoDulceriaPosDto {
+  stockFraccionado?: StockFraccionadoDto | null;
+  snacksYBebidas: ProductoDto[];
+  todosLosProductos: ProductoDto[];
+}
+
+export interface CalcularOrdenRequestDto {
+  itemsActuales: RegistrarVentaItemDto[];
+  skuAgregar?: string | null;
+  idProductoAgregar?: number | null;
+  cantidadAgregar?: number;
+}
+
+export interface OrdenLineaCalculadaDto {
+  idLinea: string;
+  idProducto?: number;
+  idFuncion?: number;
+  sku: string;
+  nombre: string;
+  tipo: string;
+  etiquetaCategoria: string;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+  asientos?: string[];
+}
+
+export interface ResumenOrdenCalculadoDto {
+  items: OrdenLineaCalculadaDto[];
+  totalArticulos: number;
+  subtotalBoletos: number;
+  subtotalDulceria: number;
+  totalVenta: number;
+  stockFraccionado?: StockFraccionadoDto | null;
+  productosActualizados?: ProductoDto[];
+  productoAgregado?: ProductoDto | null;
 }
 
 export interface RegistrarVentaItemDto {
@@ -170,6 +226,19 @@ export interface PreordenDto {
 }
 
 // DTOs de Dashboard Financiero (HU-10)
+export interface CrearPreordenItemDulceriaDto {
+  idProducto: number;
+  cantidad: number;
+}
+
+export interface CrearPreordenDto {
+  idFuncion: number;
+  boletos: number;
+  nombreCliente: string;
+  telefonoCliente: string;
+  combos?: CrearPreordenItemDulceriaDto[];
+}
+
 export interface PeriodoDashboardDto {
   fechaInicio: string;
   fechaFin: string;
@@ -217,4 +286,17 @@ export interface SemanaCinematograficaDto {
   fechaInicio: string;
   fechaFin: string;
   descripcion: string;
+}
+
+export interface TrailerItemDto {
+  key: string;
+  nombre: string;
+  tipo: string;
+}
+
+export interface PeliculaTrailerDto {
+  idPelicula: number;
+  titulo: string;
+  trailerKey?: string | null;
+  trailers: TrailerItemDto[];
 }
