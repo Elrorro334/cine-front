@@ -9,6 +9,7 @@ import {
   CrearPreordenDto,
   PreordenDto,
   PeliculaTrailerDto,
+  SolicitarCodigoPreordenResponseDto,
 } from '@/types/api';
 import { Movie, Promotion } from '@/types/cartelera';
 
@@ -167,6 +168,26 @@ export const carteleraService = {
    */
   async obtenerPreorden(codigoQr: string): Promise<PreordenDto> {
     return apiFetch<PreordenDto>(`/taquilla/preorden/${encodeURIComponent(codigoQr)}`);
+  },
+
+  /**
+   * Solicita envío de código OTP vía SMS (Twilio) para recuperar pre-órdenes asociadas a un teléfono
+   */
+  async solicitarCodigoPreordenes(telefono: string): Promise<SolicitarCodigoPreordenResponseDto> {
+    return apiFetch<SolicitarCodigoPreordenResponseDto>('/cartelera/preordenes/solicitar-codigo', {
+      method: 'POST',
+      body: JSON.stringify({ telefono }),
+    });
+  },
+
+  /**
+   * Verifica el código OTP recibido por SMS y retorna las pre-órdenes de SQL Server
+   */
+  async verificarCodigoPreordenes(telefono: string, codigo: string): Promise<PreordenDto[]> {
+    return apiFetch<PreordenDto[]>('/cartelera/preordenes/verificar-codigo', {
+      method: 'POST',
+      body: JSON.stringify({ telefono, codigo }),
+    });
   },
 
   /**
