@@ -15,6 +15,7 @@ import {
   OrdenLineaCalculadaDto,
   RegistrarVentaDto,
   RegistrarVentaItemDto,
+  VentaConfirmadaDto,
 } from '@/types/api';
 
 import SeatMapModal from '@/components/pos/SeatMapModal';
@@ -30,14 +31,309 @@ interface CartItem {
   precio: number;
   cantidad: number;
   subtotal: number;
+  esPreorden?: boolean;
+  codigoPreorden?: string | null;
   metadata?: {
     idProducto?: number;
     idFuncion?: number;
     peliId?: number;
     horario?: string;
+    nombreSala?: string;
     sku?: string;
     asientos?: string[];
   };
+}
+
+type VistaCobro = 'selector' | 'efectivo' | 'tarjeta';
+
+function formatearHoraFuncion(horaRaw?: string): string {
+  if (!horaRaw) return '';
+  const match = /(\d{2}:\d{2})/.exec(horaRaw);
+  if (match) return match[1];
+  return horaRaw.substring(0, 5);
+}
+
+function construirIdLinea(linea: OrdenLineaCalculadaDto, index: number): string {
+  if (linea.idLinea) return linea.idLinea;
+  if (linea.tipo === 'boleto') {
+    return `bol_${linea.idFuncion ?? index}_${(linea.asientos ?? []).join('_')}`;
+  }
+  return `snk_${linea.idProducto ?? linea.sku}_${index}`;
+}
+
+function extraerMensajeErrorServidor(err: unknown, fallback: string): string {
+  const apiErr = err as { message?: string; data?: { error?: string; message?: string } };
+  return apiErr?.data?.error || apiErr?.data?.message || apiErr?.message || fallback;
+}
+
+function validarPreordenRecibida(pre: PreordenDto | null): string | null {
+  if (!pre) {
+    return 'Código QR no encontrado en base de datos.';
+  }
+  if (pre.expirada || (pre.diasTranscurridos !== undefined && pre.diasTranscurridos > 12)) {
+    return (
+      pre.motivoRechazo ||
+      `La pre-orden '${pre.codigo}' ha expirado (supera los 12 días de vigencia).`
+    );
+  }
+  if (pre.canjeada || !pre.estadoActivo) {
+    return (
+      pre.motivoRechazo ||
+      `La pre-orden '${pre.codigo}' ya fue canjeada o se encuentra cancelada / inactiva.`
+    );
+  }
+  if (pre.boletosGeneral <= 0) {
+    return 'La pre-orden no contiene boletos para canjear.';
+  }
+  return null;
+}
+
+interface PasoCobroSectionProps {
+  totalGeneral: number;
+  vistaCobro: VistaCobro;
+  setVistaCobro: (vista: VistaCobro) => void;
+  efectivoInput: string;
+  setEfectivoInput: (val: string) => void;
+  voucherInput: string;
+  setVoucherInput: (val: string) => void;
+  isProcessingSale: boolean;
+  carritoVacio: boolean;
+  onConfirmarCobro: (
+    metodo: 'Efectivo' | 'Tarjeta Mercado Pago',
+    montoRecibido?: number,
+    voucher?: string
+  ) => void;
+}
+
+function PasoCobroSection({
+  totalGeneral,
+  vistaCobro,
+  setVistaCobro,
+  efectivoInput,
+  setEfectivoInput,
+  voucherInput,
+  setVoucherInput,
+  isProcessingSale,
+  carritoVacio,
+  onConfirmarCobro,
+}: Readonly<PasoCobroSectionProps>) {
+  const montoRecibidoNum = Number.parseFloat(efectivoInput);
+  const recibidoValido = !Number.isNaN(montoRecibidoNum) && montoRecibidoNum >= totalGeneral;
+  const cambioCalculado = recibidoValido ? montoRecibidoNum - totalGeneral : 0;
+
+  if (vistaCobro === 'efectivo') {
+    return (
+      <div className="mx-auto my-auto w-full max-w-[460px] rounded-2xl border border-[#262626] bg-[#141414] p-6 shadow-2xl">
+        {/* Encabezado COBRO EN EFECTIVO (Mockup 13) */}
+        <div className="mb-5 flex items-center gap-3 border-b border-[#262626] pb-3">
+          <button
+            type="button"
+            aria-label="Volver a selección de método de pago"
+            onClick={() => setVistaCobro('selector')}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#262626] bg-[#0a0a0a] text-gray-300 transition hover:border-white/30 hover:text-white"
+          >
+            <i className="fa-solid fa-arrow-left text-xs" />
+          </button>
+          <h2 className="text-sm font-black uppercase tracking-wider text-white">
+            COBRO EN EFECTIVO
+          </h2>
+        </div>
+
+        {/* Cajas TOTAL A PAGAR y CAMBIO */}
+        <div className="mb-4 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-[#262626] bg-[#0a0a0a] p-3.5 text-center">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[#a3a3a3]">
+              TOTAL A PAGAR
+            </span>
+            <span className="mt-1 block font-mono text-2xl font-black text-white">
+              ${totalGeneral}
+            </span>
+          </div>
+
+          <div className="rounded-xl border border-[#F57C00]/40 bg-[#1a110a] p-3.5 text-center">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-[#F57C00]">
+              CAMBIO
+            </span>
+            <span
+              data-testid="cambio-calculado"
+              className="mt-1 block font-mono text-2xl font-black text-[#F57C00]"
+            >
+              ${cambioCalculado.toFixed(2)}
+            </span>
+          </div>
+        </div>
+
+        {/* Input EFECTIVO RECIBIDO DEL CLIENTE */}
+        <div className="mb-4">
+          <label
+            htmlFor="efectivo-recibido-input"
+            className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-[#a3a3a3]"
+          >
+            EFECTIVO RECIBIDO DEL CLIENTE:
+          </label>
+          <div className="relative flex items-center">
+            <span className="pointer-events-none absolute left-4 font-mono text-lg font-black text-emerald-400">
+              $
+            </span>
+            <input
+              id="efectivo-recibido-input"
+              type="number"
+              min={0}
+              step="1"
+              value={efectivoInput}
+              onChange={(e) => setEfectivoInput(e.target.value)}
+              aria-label="Efectivo recibido del cliente"
+              placeholder="0"
+              className="w-full rounded-xl border border-emerald-500/60 bg-[#050505] py-3 pl-9 pr-4 text-center font-mono text-xl font-black text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+
+          {/* Botones rápidos de denominación: EXACTO, $100, $200, $500 */}
+          <div className="mt-2.5 grid grid-cols-4 gap-2">
+            <button
+              type="button"
+              onClick={() => setEfectivoInput(String(totalGeneral))}
+              className="rounded-lg border border-[#262626] bg-[#1E1E1E] py-1.5 text-[11px] font-extrabold uppercase text-gray-200 transition hover:border-emerald-500/50 hover:text-white"
+            >
+              EXACTO
+            </button>
+            {[100, 200, 500].map((monto) => (
+              <button
+                key={monto}
+                type="button"
+                onClick={() => setEfectivoInput(String(monto))}
+                className="rounded-lg border border-[#262626] bg-[#1E1E1E] py-1.5 font-mono text-[11px] font-extrabold text-gray-200 transition hover:border-emerald-500/50 hover:text-white"
+              >
+                ${monto}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Botón REGISTRAR VENTA E IMPRIMIR */}
+        <button
+          type="button"
+          disabled={isProcessingSale || carritoVacio || !recibidoValido}
+          onClick={() => onConfirmarCobro('Efectivo', montoRecibidoNum)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-[0_6px_20px_rgba(16,185,129,0.35)] transition hover:bg-emerald-500 disabled:opacity-45"
+        >
+          <i className="fa-solid fa-print" />
+          <span>{isProcessingSale ? 'PROCESANDO...' : 'REGISTRAR VENTA E IMPRIMIR'}</span>
+        </button>
+      </div>
+    );
+  }
+
+  if (vistaCobro === 'tarjeta') {
+    return (
+      <div className="mx-auto my-auto w-full max-w-[460px] rounded-2xl border border-[#262626] bg-[#141414] p-6 shadow-2xl">
+        {/* Encabezado TERMINAL MERCADO PAGO (Mockup 13) */}
+        <div className="mb-5 flex items-center gap-3 border-b border-[#262626] pb-3">
+          <button
+            type="button"
+            aria-label="Volver a selección de método de pago"
+            onClick={() => setVistaCobro('selector')}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#262626] bg-[#0a0a0a] text-gray-300 transition hover:border-white/30 hover:text-white"
+          >
+            <i className="fa-solid fa-arrow-left text-xs" />
+          </button>
+          <h2 className="text-sm font-black uppercase tracking-wider text-white">
+            TERMINAL MERCADO PAGO
+          </h2>
+        </div>
+
+        {/* Caja azul MONTO EN TERMINAL */}
+        <div className="mb-4 rounded-xl border border-sky-500/40 bg-sky-950/30 p-4 text-center">
+          <span className="block text-[10px] font-bold uppercase tracking-wider text-sky-400">
+            MONTO EN TERMINAL:
+          </span>
+          <span className="mt-1 block font-mono text-3xl font-black text-white">
+            ${totalGeneral}
+          </span>
+        </div>
+
+        {/* Input FOLIO DE AUTORIZACIÓN / VOUCHER */}
+        <div className="mb-4">
+          <label
+            htmlFor="voucher-mp-input"
+            className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-[#a3a3a3]"
+          >
+            FOLIO DE AUTORIZACIÓN / VOUCHER:
+          </label>
+          <input
+            id="voucher-mp-input"
+            type="text"
+            value={voucherInput}
+            onChange={(e) => setVoucherInput(e.target.value)}
+            aria-label="Folio de autorización"
+            placeholder="EJ: 23423"
+            className="w-full rounded-xl border border-sky-500/60 bg-[#050505] px-4 py-3 text-center font-mono text-base font-black uppercase tracking-widest text-white focus:border-sky-400 focus:outline-none"
+          />
+          <p className="mt-1.5 text-center text-[10px] text-[#737373]">
+            Ingresa el folio de la transacción para cuadre de caja de fin de turno.
+          </p>
+        </div>
+
+        {/* Botón azul REGISTRAR VENTA E IMPRIMIR */}
+        <button
+          type="button"
+          disabled={isProcessingSale || carritoVacio || !voucherInput.trim()}
+          onClick={() => onConfirmarCobro('Tarjeta Mercado Pago', totalGeneral, voucherInput.trim())}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#009EE3] py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-[0_6px_20px_rgba(0,158,227,0.35)] transition hover:bg-sky-500 disabled:opacity-45"
+        >
+          <i className="fa-solid fa-check" />
+          <span>{isProcessingSale ? 'PROCESANDO...' : 'REGISTRAR VENTA E IMPRIMIR'}</span>
+        </button>
+      </div>
+    );
+  }
+
+  // Vista Inicial Selector de Método de Pago (Mockup 13)
+  return (
+    <div className="mx-auto my-auto w-full max-w-[480px] rounded-2xl border border-[#262626] bg-[#141414] p-7 text-center shadow-2xl">
+      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#262626] bg-[#0a0a0a] text-lg text-[#F57C00]">
+        <i className="fa-solid fa-file-invoice-dollar" />
+      </div>
+
+      <h2 className="text-[11px] font-bold uppercase tracking-widest text-[#a3a3a3]">
+        MONTO TOTAL A COBRAR
+      </h2>
+      <p className="mt-1 font-mono text-5xl font-black text-white">${totalGeneral}</p>
+
+      {/* Dos tarjetas grandes: PAGO EN EFECTIVO y TARJETA MERCADO PAGO */}
+      <div className="mt-6 grid grid-cols-2 gap-3.5">
+        <button
+          type="button"
+          disabled={isProcessingSale || carritoVacio}
+          onClick={() => {
+            setEfectivoInput(String(totalGeneral));
+            setVistaCobro('efectivo');
+          }}
+          className="group flex flex-col items-center justify-center gap-2.5 rounded-xl border border-emerald-500/40 bg-emerald-950/20 p-5 transition hover:border-emerald-400 hover:bg-emerald-900/30 disabled:opacity-45"
+        >
+          <i className="fa-solid fa-money-bill-wave text-2xl text-emerald-400 transition group-hover:scale-110" />
+          <span className="text-xs font-black uppercase tracking-wider text-white">
+            PAGO EN EFECTIVO
+          </span>
+        </button>
+
+        <button
+          type="button"
+          disabled={isProcessingSale || carritoVacio}
+          onClick={() => {
+            setVoucherInput('AUT-MP-01');
+            setVistaCobro('tarjeta');
+          }}
+          className="group flex flex-col items-center justify-center gap-2.5 rounded-xl border border-sky-500/40 bg-sky-950/20 p-5 transition hover:border-sky-400 hover:bg-sky-900/30 disabled:opacity-45"
+        >
+          <i className="fa-solid fa-credit-card text-2xl text-sky-400 transition group-hover:scale-110" />
+          <span className="text-xs font-black uppercase tracking-wider text-white">
+            TARJETA MERCADO PAGO
+          </span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function PosPage() {
@@ -45,6 +341,7 @@ export default function PosPage() {
 
   const [reloj, setReloj] = useState<string>('--:--');
   const [pasoActual, setPasoActual] = useState<number>(1);
+  const [vistaCobro, setVistaCobro] = useState<VistaCobro>('selector');
 
   // Cartelera dinámica desde BD
   const [cartelera, setCartelera] = useState<PeliculaCarteleraDto[]>([]);
@@ -62,6 +359,8 @@ export default function PosPage() {
   const [carrito, setCarrito] = useState<CartItem[]>([]);
   const [totalGeneral, setTotalGeneral] = useState<number>(0);
   const [totalArticulos, setTotalArticulos] = useState<number>(0);
+  const [codigoPreordenActiva, setCodigoPreordenActiva] = useState<string | null>(null);
+  const [preordenesActivas, setPreordenesActivas] = useState<PreordenDto[]>([]);
 
   const [isSeatModalOpen, setIsSeatModalOpen] = useState<boolean>(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
@@ -73,17 +372,14 @@ export default function PosPage() {
   const [selectedFuncion, setSelectedFuncion] = useState<FuncionHorarioDto | null>(null);
   const [pendingPreorden, setPendingPreorden] = useState<PreordenDto | null>(null);
 
+  // Estados de cobro y ticket (HU-09)
   const [metodoPago, setMetodoPago] = useState<'Efectivo' | 'Tarjeta Mercado Pago'>('Efectivo');
+  const [efectivoInput, setEfectivoInput] = useState<string>('');
+  const [voucherInput, setVoucherInput] = useState<string>('');
   const [ticketFolio, setTicketFolio] = useState<string>('');
+  const [ticketConfirmado, setTicketConfirmado] = useState<VentaConfirmadaDto | null>(null);
   const [isProcessingSale, setIsProcessingSale] = useState<boolean>(false);
   const [mensajeFeedback, setMensajeFeedback] = useState<string | null>(null);
-
-  const formatearHoraFuncion = (horaRaw?: string): string => {
-    if (!horaRaw) return '';
-    const match = /(\d{2}:\d{2})/.exec(horaRaw);
-    if (match) return match[1];
-    return horaRaw.substring(0, 5);
-  };
 
   const mapearCarritoARequestItems = (items: CartItem[]): RegistrarVentaItemDto[] =>
     items.map((item: CartItem) => ({
@@ -95,6 +391,9 @@ export default function PosPage() {
       cantidad: item.cantidad,
       precio: item.precio,
       asientos: item.metadata?.asientos,
+      esPreorden: Boolean(item.esPreorden),
+      codigoPreorden: item.codigoPreorden ?? null,
+      nombreSala: item.metadata?.nombreSala || 'SALA 1',
     }));
 
   const sincronizarOrdenConBackend = useCallback(
@@ -113,25 +412,35 @@ export default function PosPage() {
 
           if (respuesta) {
             const nuevosItems: CartItem[] = respuesta.items.map(
-              (linea: OrdenLineaCalculadaDto, index: number) => ({
-                id:
-                  linea.idLinea ||
-                  (linea.tipo === 'boleto'
-                    ? `bol_${linea.idFuncion ?? index}_${(linea.asientos ?? []).join('_')}`
-                    : `snk_${linea.idProducto ?? linea.sku}`),
-                tipo: linea.tipo === 'boleto' ? 'boleto' : 'dulceria',
-                etiquetaCategoria: linea.etiquetaCategoria,
-                nombre: linea.nombre,
-                precio: linea.precioUnitario,
-                cantidad: linea.cantidad,
-                subtotal: linea.subtotal,
-                metadata: {
-                  idProducto: linea.idProducto,
-                  idFuncion: linea.idFuncion,
-                  sku: linea.sku,
-                  asientos: linea.asientos,
-                },
-              })
+              (linea: OrdenLineaCalculadaDto, index: number) => {
+                const previo = itemsBase[index];
+                const esLineaPreorden =
+                  linea.esPreorden ??
+                  (previo?.esPreorden && previo?.nombre === linea.nombre) ??
+                  false;
+                const codigoPre =
+                  linea.codigoPreorden ??
+                  (esLineaPreorden ? previo?.codigoPreorden ?? null : null);
+
+                return {
+                  id: construirIdLinea(linea, index),
+                  tipo: linea.tipo === 'boleto' ? 'boleto' : 'dulceria',
+                  etiquetaCategoria: linea.etiquetaCategoria,
+                  nombre: linea.nombre,
+                  precio: linea.precioUnitario,
+                  cantidad: linea.cantidad,
+                  subtotal: linea.subtotal,
+                  esPreorden: esLineaPreorden,
+                  codigoPreorden: codigoPre,
+                  metadata: {
+                    idProducto: linea.idProducto,
+                    idFuncion: linea.idFuncion,
+                    sku: linea.sku,
+                    asientos: linea.asientos,
+                    nombreSala: previo?.metadata?.nombreSala || 'SALA 1',
+                  },
+                };
+              }
             );
 
             setCarrito(nuevosItems);
@@ -146,37 +455,35 @@ export default function PosPage() {
               );
             }
             setMensajeFeedback(null);
-            return;
           }
         }
       } catch (err: unknown) {
-        const apiErr = err as { message?: string; data?: { error?: string; message?: string } };
         setMensajeFeedback(
-          apiErr?.data?.error ||
-            apiErr?.data?.message ||
-            apiErr?.message ||
-            'Error al validar el producto en el servidor.'
+          extraerMensajeErrorServidor(err, 'Error al validar el producto en el servidor.')
         );
       }
     },
     []
   );
 
-  const fetchCartelera = useCallback(async (term?: string) => {
-    try {
-      setLoadingCartelera(true);
-      const data = await taquillaService.getCartelera(term);
-      setCartelera(data);
-    } catch (err: unknown) {
-      const error = err as { status?: number };
-      if (error?.status === 401) {
-        authService.logout();
-        router.push('/');
+  const fetchCartelera = useCallback(
+    async (term?: string) => {
+      try {
+        setLoadingCartelera(true);
+        const data = await taquillaService.getCartelera(term);
+        setCartelera(data);
+      } catch (err: unknown) {
+        const error = err as { status?: number };
+        if (error?.status === 401) {
+          authService.logout();
+          router.push('/');
+        }
+      } finally {
+        setLoadingCartelera(false);
       }
-    } finally {
-      setLoadingCartelera(false);
-    }
-  }, [router]);
+    },
+    [router]
+  );
 
   const fetchDulceria = useCallback(async () => {
     try {
@@ -198,6 +505,16 @@ export default function PosPage() {
     }
   }, []);
 
+  const cargarPreordenesActivas = useCallback(async () => {
+    if (typeof taquillaService.getPreordenesActivas !== 'function') return;
+    try {
+      const lista = await taquillaService.getPreordenesActivas();
+      setPreordenesActivas(Array.isArray(lista) ? lista : []);
+    } catch {
+      setPreordenesActivas([]);
+    }
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     const session = authService.getUserSession();
@@ -206,8 +523,13 @@ export default function PosPage() {
       return;
     }
 
-    void fetchCartelera();
-    void fetchDulceria();
+    const inicializarDatosPos = async () => {
+      await Promise.resolve();
+      if (!isMounted) return;
+      await Promise.all([fetchCartelera(), fetchDulceria()]);
+    };
+
+    void inicializarDatosPos();
 
     const interval = setInterval(() => {
       if (isMounted) {
@@ -227,7 +549,16 @@ export default function PosPage() {
     };
   }, [router, fetchCartelera, fetchDulceria]);
 
+  const irAPaso = (nuevoPaso: number) => {
+    setPasoActual(nuevoPaso);
+    if (nuevoPaso === 3) {
+      setVistaCobro('selector');
+      setEfectivoInput(String(totalGeneral));
+    }
+  };
+
   const handleAgregarProductoDulceria = async (producto: ProductoDto, cantidad = 1) => {
+    if (pasoActual === 3) return;
     if (cantidad > 0 && producto.stock <= 0) {
       setMensajeFeedback(`El producto "${producto.nombre}" no tiene stock disponible.`);
       return;
@@ -241,7 +572,8 @@ export default function PosPage() {
   };
 
   const handleCambiarCantidadItem = async (item: CartItem, delta: number) => {
-    if (item.tipo === 'boleto') return;
+    // HU-08 y HU-09: No modificar boletos, líneas de pre-orden ni cuando se está en Paso 3 (Cobro)
+    if (pasoActual === 3 || item.tipo === 'boleto' || item.esPreorden) return;
 
     await sincronizarOrdenConBackend(carrito, {
       idProductoAgregar: item.metadata?.idProducto,
@@ -251,6 +583,7 @@ export default function PosPage() {
   };
 
   const handleEscanearSku = async () => {
+    if (pasoActual === 3) return;
     const skuLimpio = skuInput.trim();
     if (!skuLimpio) return;
 
@@ -262,15 +595,22 @@ export default function PosPage() {
   };
 
   const eliminarDelCarrito = async (id: string) => {
+    // HU-08 y HU-09: En Paso 3 o en ítems de pre-orden no se permite eliminar líneas individuales
+    if (pasoActual === 3) return;
+    const target = carrito.find((i: CartItem) => i.id === id);
+    if (target?.esPreorden) return;
+
     const filtrados = carrito.filter((i: CartItem) => i.id !== id);
     setCarrito(filtrados);
     await sincronizarOrdenConBackend(filtrados, { cantidadAgregar: 0 });
   };
 
   const limpiarCarrito = async () => {
+    if (pasoActual === 3) return;
     setCarrito([]);
     setTotalGeneral(0);
     setTotalArticulos(0);
+    setCodigoPreordenActiva(null);
     await sincronizarOrdenConBackend([], { cantidadAgregar: 0 });
   };
 
@@ -288,14 +628,17 @@ export default function PosPage() {
       {
         id: `pre_bol_${pre.codigo}`,
         tipo: 'boleto',
-        etiquetaCategoria: 'TAQUILLA',
+        etiquetaCategoria: 'PRE-ORDEN TAQUILLA',
         nombre: `${pre.pelicula} (${formatearHoraFuncion(pre.horario)}) - ${pre.cliente}`,
         precio: pre.precioBoleto,
         cantidad: asientos.length,
         subtotal: pre.precioBoleto * asientos.length,
+        esPreorden: true,
+        codigoPreorden: pre.codigo,
         metadata: {
           idFuncion: pre.idFuncion,
           horario: pre.horario,
+          nombreSala: 'SALA 1',
           sku: 'BOL-GEN',
           asientos,
         },
@@ -303,14 +646,21 @@ export default function PosPage() {
       ...(pre.combos ?? []).map((combo: PreordenComboDto, index: number) => ({
         id: `pre_cmb_${pre.codigo}_${index}`,
         tipo: 'dulceria' as const,
-        etiquetaCategoria: 'DULCERÍA',
+        etiquetaCategoria: 'PRE-ORDEN DULCERÍA',
         nombre: combo.nombre,
         precio: combo.precio,
         cantidad: combo.cantidad,
         subtotal: combo.precio * combo.cantidad,
+        esPreorden: true,
+        codigoPreorden: pre.codigo,
+        metadata: {
+          idProducto: combo.idProducto ?? undefined,
+          sku: combo.sku || `PRE-CMB-${index + 1}`,
+        },
       })),
     ];
 
+    setCodigoPreordenActiva(pre.codigo);
     setCarrito(itemsNuevos);
     await sincronizarOrdenConBackend(itemsNuevos, { cantidadAgregar: 0 });
   };
@@ -319,7 +669,7 @@ export default function PosPage() {
     if (pendingPreorden) {
       await agregarPreordenAlCarrito(pendingPreorden, asientos);
       setPendingPreorden(null);
-      setPasoActual(3);
+      irAPaso(3);
       return;
     }
 
@@ -339,6 +689,7 @@ export default function PosPage() {
         peliId: selectedPeli.idPelicula,
         idFuncion: selectedFuncion.idFuncion,
         horario: selectedFuncion.hora,
+        nombreSala: selectedFuncion.nombreSala || 'SALA 1',
         sku: 'BOL-GEN',
         asientos,
       },
@@ -353,21 +704,13 @@ export default function PosPage() {
     setMensajeFeedback(null);
     try {
       const pre = await taquillaService.getPreorden(codigo);
-      if (!pre) {
-        setMensajeFeedback('Código QR no encontrado en base de datos.');
+      const errorValidacion = validarPreordenRecibida(pre);
+      if (errorValidacion) {
+        setMensajeFeedback(errorValidacion);
         return;
       }
 
-      if (!pre.estadoActivo) {
-        setMensajeFeedback('La pre-orden se encuentra cancelada o inactiva.');
-        return;
-      }
-
-      if (pre.boletosGeneral <= 0) {
-        setMensajeFeedback('La pre-orden no contiene boletos para canjear.');
-        return;
-      }
-
+      setIsQrModalOpen(false);
       setPendingPreorden(pre);
       setSelectedPeli({
         idPelicula: 0,
@@ -377,32 +720,65 @@ export default function PosPage() {
       setSelectedFuncion({
         idFuncion: pre.idFuncion,
         hora: pre.horario,
-        nombreSala: '',
+        nombreSala: 'SALA 1',
         precio: pre.precioBoleto,
       });
       setRequiredSeats(pre.boletosGeneral);
       setIsSeatModalOpen(true);
-    } catch {
-      setMensajeFeedback('Error al validar la pre-orden desde SQL Server.');
+    } catch (err: unknown) {
+      setMensajeFeedback(
+        extraerMensajeErrorServidor(err, 'Error al validar la pre-orden desde SQL Server.')
+      );
     }
   };
 
-  const finalizarVenta = async (metodo: 'Efectivo' | 'Tarjeta Mercado Pago') => {
+  const finalizarVenta = async (
+    metodo: 'Efectivo' | 'Tarjeta Mercado Pago',
+    montoRecibidoParam?: number,
+    voucherParam?: string
+  ) => {
     if (carrito.length === 0) return;
+
+    const montoRecibidoEfectivo =
+      metodo === 'Efectivo' ? (montoRecibidoParam ?? totalGeneral) : totalGeneral;
+
+    if (metodo === 'Efectivo' && montoRecibidoEfectivo < totalGeneral) {
+      setMensajeFeedback('El efectivo recibido no puede ser menor al monto total a pagar.');
+      return;
+    }
 
     try {
       setIsProcessingSale(true);
       setMetodoPago(metodo);
 
       const session = authService.getUserSession();
+      const itemsRequest = mapearCarritoARequestItems(carrito);
       const payload: RegistrarVentaDto = {
         idVendedor: session?.idVendedor || 1,
         metodoPago: metodo,
-        items: mapearCarritoARequestItems(carrito),
+        montoRecibido: montoRecibidoEfectivo,
+        folioAutorizacion: metodo === 'Tarjeta Mercado Pago' ? (voucherParam || 'AUT-MP') : null,
+        codigoPreorden: codigoPreordenActiva,
+        items: itemsRequest,
       };
 
       const resultado = await taquillaService.registrarVenta(payload);
+      const cambioCalc =
+        metodo === 'Efectivo' ? Math.max(0, montoRecibidoEfectivo - totalGeneral) : 0;
+
       setTicketFolio(resultado.folio);
+      setTicketConfirmado({
+        ...resultado,
+        total: resultado.total ?? totalGeneral,
+        metodoPago: resultado.metodoPago || metodo,
+        montoRecibido: resultado.montoRecibido ?? montoRecibidoEfectivo,
+        cambio: resultado.cambio ?? cambioCalc,
+        folioAutorizacion: resultado.folioAutorizacion ?? payload.folioAutorizacion,
+        rfcCine: resultado.rfcCine || 'CTX-260414-9X0',
+        codigoBarrasTicket: resultado.codigoBarrasTicket || '7501092840192',
+        codigoPreordenCanjeada: resultado.codigoPreordenCanjeada ?? codigoPreordenActiva,
+        items: resultado.items?.length ? resultado.items : itemsRequest,
+      });
       setIsTicketModalOpen(true);
 
       // Refrescar inventario y funciones en tiempo real
@@ -413,7 +789,9 @@ export default function PosPage() {
       if (err instanceof ApiError && err.status === 409) {
         setMensajeFeedback('Asiento no disponible: ' + (err.message ?? ''));
       } else {
-        setMensajeFeedback('Error al procesar la venta en la base de datos.');
+        setMensajeFeedback(
+          extraerMensajeErrorServidor(err, 'Error al procesar la venta en la base de datos.')
+        );
       }
     } finally {
       setIsProcessingSale(false);
@@ -424,6 +802,11 @@ export default function PosPage() {
     setCarrito([]);
     setTotalGeneral(0);
     setTotalArticulos(0);
+    setCodigoPreordenActiva(null);
+    setTicketConfirmado(null);
+    setVistaCobro('selector');
+    setEfectivoInput('');
+    setVoucherInput('');
     setPasoActual(1);
     setIsTicketModalOpen(false);
     setMensajeFeedback(null);
@@ -447,9 +830,14 @@ export default function PosPage() {
     ...(stockFraccionado?.productoPizzaCompleta ? [stockFraccionado.productoPizzaCompleta] : []),
   ];
 
+  const carritoBloqueadoPorCobro = pasoActual === 3;
+
   return (
     <>
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+      <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      />
       <div className="bg-[#0a0a0a] text-[#f3f4f6] min-h-screen h-screen flex flex-col font-['Montserrat',sans-serif]">
         {/* Header POS */}
         <header className="bg-[#111111] border-b border-[#262626] px-4 py-2.5 flex justify-between items-center shrink-0">
@@ -474,7 +862,10 @@ export default function PosPage() {
             </button>
             <button
               type="button"
-              onClick={() => setIsQrModalOpen(true)}
+              onClick={() => {
+                void cargarPreordenesActivas();
+                setIsQrModalOpen(true);
+              }}
               className="bg-[#D81B60]/20 hover:bg-[#D81B60]/30 text-white border border-[#D81B60] px-3 py-1.5 rounded-lg text-xs font-bold uppercase flex items-center gap-1.5 transition"
             >
               <i className="fa-solid fa-qrcode text-xs" />
@@ -498,7 +889,7 @@ export default function PosPage() {
         <nav className="bg-[#141414] border-b border-[#262626] px-4 py-2 flex items-center gap-3 shrink-0">
           <button
             type="button"
-            onClick={() => setPasoActual(1)}
+            onClick={() => irAPaso(1)}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition ${
               pasoActual === 1
                 ? 'bg-[#D81B60] text-white shadow'
@@ -510,7 +901,7 @@ export default function PosPage() {
           </button>
           <button
             type="button"
-            onClick={() => setPasoActual(2)}
+            onClick={() => irAPaso(2)}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition ${
               pasoActual === 2
                 ? 'bg-[#F57C00] text-white shadow'
@@ -522,7 +913,7 @@ export default function PosPage() {
           </button>
           <button
             type="button"
-            onClick={() => setPasoActual(3)}
+            onClick={() => irAPaso(3)}
             disabled={carrito.length === 0}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition disabled:opacity-40 ${
               pasoActual === 3
@@ -554,7 +945,7 @@ export default function PosPage() {
 
         <main className="flex-grow flex overflow-hidden">
           {/* Panel Izquierdo: Catálogo según Paso Actual */}
-          <section className="w-full lg:w-2/3 bg-[#0a0a0a] p-4 space-y-4 overflow-y-auto">
+          <section className="w-full lg:w-2/3 bg-[#0a0a0a] p-4 space-y-4 overflow-y-auto flex flex-col">
             {/* PASO 1: TAQUILLA */}
             {pasoActual === 1 && (
               <div className="space-y-4">
@@ -597,7 +988,10 @@ export default function PosPage() {
                               {pelicula.titulo}
                             </h3>
                             <p className="text-[10px] text-[#a3a3a3] mt-0.5">
-                              Clasif. <span className="text-amber-400 font-bold">{pelicula.clasificacion || 'B'}</span>{' '}
+                              Clasif.{' '}
+                              <span className="text-amber-400 font-bold">
+                                {pelicula.clasificacion || 'B'}
+                              </span>{' '}
                               • {pelicula.duracion || 115} min
                             </p>
                           </div>
@@ -690,8 +1084,12 @@ export default function PosPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {botonesPizza.map((pizzaProd: ProductoDto) => {
                         const factor = pizzaProd.factorFraccion ?? 1;
-                        const sinRebanadasSuficientes = stockFraccionado.stockRebanadasActual < factor;
+                        const sinRebanadasSuficientes =
+                          stockFraccionado.stockRebanadasActual < factor;
                         const esPizzaCompleta = factor > 1;
+                        const textoDescuento = esPizzaCompleta
+                          ? `Descuenta ${factor} rebanadas del stock`
+                          : 'Descuenta 1 rebanada del stock';
 
                         return (
                           <button
@@ -706,12 +1104,11 @@ export default function PosPage() {
                             } disabled:opacity-40 disabled:cursor-not-allowed`}
                           >
                             <div>
-                              <p className="text-xs font-black uppercase text-white">{pizzaProd.nombre}</p>
+                              <p className="text-xs font-black uppercase text-white">
+                                {pizzaProd.nombre}
+                              </p>
                               <p className="text-[10px] text-[#a3a3a3]">
-                                {pizzaProd.descripcionDescuento ||
-                                  (esPizzaCompleta
-                                    ? `Descuenta ${factor} rebanadas del stock`
-                                    : 'Descuenta 1 rebanada del stock')}
+                                {pizzaProd.descripcionDescuento || textoDescuento}
                               </p>
                             </div>
                             <span className="text-base font-black text-[#F57C00] font-mono">
@@ -817,56 +1214,26 @@ export default function PosPage() {
               </div>
             )}
 
-            {/* PASO 3: COBRO Y FINALIZACIÓN */}
+            {/* PASO 3: PASARELA DE COBRO (HU-09 / MOCKUP 13) */}
             {pasoActual === 3 && (
-              <div className="bg-[#111111] border border-[#262626] rounded-2xl p-6 text-center max-w-md mx-auto my-auto space-y-5 shadow-2xl">
-                <div className="w-12 h-12 rounded-full bg-emerald-950/60 border border-emerald-800 text-emerald-400 flex items-center justify-center mx-auto text-xl">
-                  <i className="fa-solid fa-dollar-sign" />
-                </div>
-
-                <div>
-                  <h2 className="text-xs font-bold uppercase text-[#a3a3a3]">Monto Total de la Orden</h2>
-                  <p className="text-4xl font-black text-white font-mono mt-1">${totalGeneral}.00 MXN</p>
-                  <p className="text-[11px] text-[#737373] mt-1">
-                    {totalArticulos || carrito.length} artículo(s) en orden
-                  </p>
-                </div>
-
-                <div className="space-y-2 pt-2">
-                  <button
-                    type="button"
-                    disabled={isProcessingSale || carrito.length === 0}
-                    onClick={() => void finalizarVenta('Efectivo')}
-                    className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-black py-3 rounded-xl uppercase text-xs tracking-wider transition shadow-lg flex items-center justify-center gap-2"
-                  >
-                    {isProcessingSale ? (
-                      <>
-                        <i className="fa-solid fa-spinner fa-spin" />
-                        <span>Guardando en BD...</span>
-                      </>
-                    ) : (
-                      <>
-                        <i className="fa-solid fa-money-bill-wave" />
-                        <span>Confirmar Pago en Efectivo</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isProcessingSale || carrito.length === 0}
-                    onClick={() => void finalizarVenta('Tarjeta Mercado Pago')}
-                    className="w-full bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white font-black py-3 rounded-xl uppercase text-xs tracking-wider transition shadow-lg flex items-center justify-center gap-2"
-                  >
-                    <i className="fa-solid fa-credit-card" />
-                    <span>Pago con Tarjeta / Mercado Pago</span>
-                  </button>
-                </div>
-              </div>
+              <PasoCobroSection
+                totalGeneral={totalGeneral}
+                vistaCobro={vistaCobro}
+                setVistaCobro={setVistaCobro}
+                efectivoInput={efectivoInput}
+                setEfectivoInput={setEfectivoInput}
+                voucherInput={voucherInput}
+                setVoucherInput={setVoucherInput}
+                isProcessingSale={isProcessingSale}
+                carritoVacio={carrito.length === 0}
+                onConfirmarCobro={(metodo, recibido, voucher) =>
+                  void finalizarVenta(metodo, recibido, voucher)
+                }
+              />
             )}
           </section>
 
-          {/* Panel Derecho: Resumen de Venta Reactivo (Mockup 12) */}
+          {/* Panel Derecho: Resumen de Venta Reactivo (Mockup 12 & Mockup 13) */}
           <aside className="w-1/3 bg-[#111111] border-l border-[#262626] p-4 flex flex-col justify-between shrink-0">
             <div className="space-y-3 overflow-y-auto">
               <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
@@ -878,7 +1245,7 @@ export default function PosPage() {
                   <span className="bg-[#D81B60]/20 text-[#D81B60] border border-[#D81B60]/40 text-[10px] font-bold px-2 py-0.5 rounded-full">
                     {totalArticulos} items
                   </span>
-                  {carrito.length > 0 && (
+                  {carrito.length > 0 && !carritoBloqueadoPorCobro && (
                     <button
                       type="button"
                       onClick={() => void limpiarCarrito()}
@@ -890,67 +1257,93 @@ export default function PosPage() {
                 </div>
               </div>
 
+              {carritoBloqueadoPorCobro && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-1.5 text-[10px] font-bold text-amber-300 flex items-center gap-1.5">
+                  <i className="fa-solid fa-lock text-[10px]" />
+                  <span>Resumen bloqueado en Cobro. Regresa al Paso 2 para ajustar.</span>
+                </div>
+              )}
+
               {carrito.length === 0 ? (
                 <div className="py-16 text-center text-xs text-[#737373]">
                   El carrito está vacío. Agrega boletos o dulcería.
                 </div>
               ) : (
-                carrito.map((item: CartItem) => (
-                  <div
-                    key={item.id}
-                    className="bg-[#050505] border border-[#262626] p-3 rounded-xl flex justify-between items-center text-xs gap-2"
-                  >
-                    <div className="space-y-0.5">
-                      <span
-                        className={`text-[9px] font-black uppercase tracking-wider ${
-                          item.tipo === 'boleto' ? 'text-[#D81B60]' : 'text-[#F57C00]'
-                        }`}
-                      >
-                        {item.etiquetaCategoria || (item.tipo === 'boleto' ? 'TAQUILLA' : 'DULCERÍA')}
-                      </span>
-                      <p className="font-bold text-white line-clamp-1">{item.nombre}</p>
-                      {item.metadata?.asientos && item.metadata.asientos.length > 0 && (
-                        <p className="text-[10px] text-[#D81B60] font-mono font-bold">
-                          Asientos: {item.metadata.asientos.join(', ')}
-                        </p>
-                      )}
-                      <p className="text-[10px] text-[#a3a3a3] font-mono">${item.precio} c/u</p>
-                    </div>
+                carrito.map((item: CartItem) => {
+                  const itemBloqueado = carritoBloqueadoPorCobro || Boolean(item.esPreorden);
+                  const categoriaLabel =
+                    item.etiquetaCategoria || (item.tipo === 'boleto' ? 'TAQUILLA' : 'DULCERÍA');
 
-                    <div className="flex items-center gap-2">
-                      {item.tipo === 'dulceria' && (
-                        <div className="flex items-center gap-1.5 bg-[#111111] border border-[#262626] rounded-lg px-1.5 py-0.5">
-                          <button
-                            type="button"
-                            aria-label={`Disminuir ${item.nombre}`}
-                            onClick={() => void handleCambiarCantidadItem(item, -1)}
-                            className="text-[#a3a3a3] hover:text-white px-1 font-bold"
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-[#050505] border border-[#262626] p-3 rounded-xl flex justify-between items-center text-xs gap-2"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`text-[9px] font-black uppercase tracking-wider ${
+                              item.tipo === 'boleto' ? 'text-[#D81B60]' : 'text-[#F57C00]'
+                            }`}
                           >
-                            -
-                          </button>
-                          <span className="font-mono font-bold text-white text-xs">{item.cantidad}</span>
-                          <button
-                            type="button"
-                            aria-label={`Aumentar ${item.nombre}`}
-                            onClick={() => void handleCambiarCantidadItem(item, 1)}
-                            className="text-[#a3a3a3] hover:text-white px-1 font-bold"
-                          >
-                            +
-                          </button>
+                            {categoriaLabel}
+                          </span>
+                          {item.esPreorden && (
+                            <span className="rounded bg-[#D81B60]/20 px-1.5 py-0.5 text-[8px] font-extrabold uppercase text-pink-300">
+                              PRE-ORDEN FIJA
+                            </span>
+                          )}
                         </div>
-                      )}
-                      <p className="font-black font-mono text-white">${item.subtotal}</p>
-                      <button
-                        type="button"
-                        onClick={() => void eliminarDelCarrito(item.id)}
-                        className="text-[#737373] hover:text-red-400 p-1"
-                        title="Eliminar artículo"
-                      >
-                        <i className="fa-solid fa-trash text-xs" />
-                      </button>
+                        <p className="font-bold text-white line-clamp-1">{item.nombre}</p>
+                        {item.metadata?.asientos && item.metadata.asientos.length > 0 && (
+                          <p className="text-[10px] text-[#D81B60] font-mono font-bold">
+                            Asientos: {item.metadata.asientos.join(', ')}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-[#a3a3a3] font-mono">
+                          {item.cantidad} x ${item.precio} c/u
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {item.tipo === 'dulceria' && !itemBloqueado && (
+                          <div className="flex items-center gap-1.5 bg-[#111111] border border-[#262626] rounded-lg px-1.5 py-0.5">
+                            <button
+                              type="button"
+                              aria-label={`Disminuir ${item.nombre}`}
+                              onClick={() => void handleCambiarCantidadItem(item, -1)}
+                              className="text-[#a3a3a3] hover:text-white px-1 font-bold"
+                            >
+                              -
+                            </button>
+                            <span className="font-mono font-bold text-white text-xs">
+                              {item.cantidad}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Aumentar ${item.nombre}`}
+                              onClick={() => void handleCambiarCantidadItem(item, 1)}
+                              className="text-[#a3a3a3] hover:text-white px-1 font-bold"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                        <p className="font-black font-mono text-white">${item.subtotal}</p>
+                        {!itemBloqueado && (
+                          <button
+                            type="button"
+                            onClick={() => void eliminarDelCarrito(item.id)}
+                            className="text-[#737373] hover:text-red-400 p-1"
+                            title="Eliminar artículo"
+                          >
+                            <i className="fa-solid fa-trash text-xs" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -958,14 +1351,16 @@ export default function PosPage() {
             <div className="border-t border-[#262626] pt-3 mt-3">
               <div className="flex justify-between items-baseline mb-3">
                 <span className="text-xs font-bold text-[#a3a3a3] uppercase">TOTAL VENTA</span>
-                <span className="text-3xl font-black text-white font-mono">${totalGeneral}.00</span>
+                <span className="text-3xl font-black text-white font-mono">
+                  ${totalGeneral}.00
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 {pasoActual > 1 && (
                   <button
                     type="button"
                     aria-label="Paso anterior"
-                    onClick={() => setPasoActual((prev: number) => Math.max(1, prev - 1))}
+                    onClick={() => irAPaso(Math.max(1, pasoActual - 1))}
                     className="bg-[#1a1a1a] hover:bg-neutral-800 text-white px-3.5 py-3 rounded-xl border border-[#262626] transition"
                   >
                     <i className="fa-solid fa-arrow-left text-xs" />
@@ -974,7 +1369,7 @@ export default function PosPage() {
                 <button
                   type="button"
                   disabled={carrito.length === 0}
-                  onClick={() => setPasoActual(3)}
+                  onClick={() => irAPaso(3)}
                   className="flex-grow bg-[#F57C00] hover:bg-orange-600 text-white py-3 rounded-xl font-black text-xs uppercase tracking-wider transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg"
                 >
                   <span>Paso 3: Cobrar</span>
@@ -1003,16 +1398,20 @@ export default function PosPage() {
         <QrScannerModal
           isOpen={isQrModalOpen}
           onClose={() => setIsQrModalOpen(false)}
-          onScanSuccess={(codigo: string) => void handleQrSuccess(codigo)}
+          onScanSuccess={(codigo: string) => handleQrSuccess(codigo)}
+          preordenesActivas={preordenesActivas}
         />
 
         <ThermalTicketModal
           isOpen={isTicketModalOpen}
+          ticket={ticketConfirmado}
           folio={ticketFolio}
           items={carrito.map((i: CartItem) => ({
             nombre: i.nombre,
             cantidad: i.cantidad,
             precio: i.precio,
+            asientos: i.metadata?.asientos,
+            nombreSala: i.metadata?.nombreSala || 'SALA 1',
           }))}
           total={totalGeneral}
           metodoPago={metodoPago}

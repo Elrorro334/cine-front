@@ -26,6 +26,8 @@ jest.mock('@/services/taquillaService', () => ({
     getButacasFuncion: jest.fn(),
     registrarVenta: jest.fn(),
     getPreorden: jest.fn(),
+    getPreordenesActivas: jest.fn(),
+    validarPreordenQr: jest.fn(),
   },
 }));
 
@@ -107,7 +109,7 @@ const crearPreordenMock = (overrides: Partial<PreordenDto> = {}): PreordenDto =>
   combos: [],
   total: 100,
   fechaCreacion: '2026-10-21',
-  vigenciaDias: 8,
+  vigenciaDias: 12,
   estadoActivo: true,
   ...overrides,
 });
@@ -119,10 +121,10 @@ describe('PosPage Component', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Escanear QR/i }));
-    fireEvent.change(screen.getByPlaceholderText(/Escribir o escanear folio/i), {
+    fireEvent.change(screen.getByLabelText(/Escribir o escanear folio/i), {
       target: { value: codigo },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Validar e Ingresar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /VALIDAR Y CARGAR EN CAJA/i }));
   };
 
   beforeEach(() => {
@@ -142,12 +144,17 @@ describe('PosPage Component', () => {
       todosLosProductos: [...productosMock, ...pizzasMock],
       stockFraccionado: stockFraccionadoInicial,
     });
+    (taquillaService.getPreordenesActivas as jest.Mock).mockResolvedValue([]);
 
     (taquillaService.calcularOrdenPos as jest.Mock).mockImplementation(
       async (req: CalcularOrdenRequestDto) => {
         const todosProductos = [...productosMock, ...pizzasMock];
         const items = (req.itemsActuales ?? []).map((item, idx) => ({
-          idLinea: item.tipo === 'boleto' ? `bol_${idx}` : `snk_${item.idProducto ?? item.sku}`,
+          idLinea: item.esPreorden
+            ? `pre_${idx}`
+            : item.tipo === 'boleto'
+              ? `bol_${idx}`
+              : `snk_${item.idProducto ?? item.sku}`,
           idProducto: item.idProducto,
           idFuncion: item.idFuncion,
           sku: item.sku,
@@ -158,6 +165,8 @@ describe('PosPage Component', () => {
           precioUnitario: item.precio,
           subtotal: item.precio * item.cantidad,
           asientos: item.asientos,
+          esPreorden: item.esPreorden,
+          codigoPreorden: item.codigoPreorden,
         }));
 
         if (req.skuAgregar || req.idProductoAgregar) {
@@ -166,7 +175,9 @@ describe('PosPage Component', () => {
           );
           if (prod && prod.stock > 0) {
             const delta = req.cantidadAgregar ?? 1;
-            const idx = items.findIndex((i) => i.idProducto === prod.idProducto || i.sku === prod.sku);
+            const idx = items.findIndex(
+              (i) => !i.esPreorden && (i.idProducto === prod.idProducto || i.sku === prod.sku)
+            );
             if (idx >= 0) {
               items[idx].cantidad += delta;
               items[idx].subtotal = items[idx].cantidad * items[idx].precioUnitario;
@@ -183,6 +194,8 @@ describe('PosPage Component', () => {
                 precioUnitario: prod.precio,
                 subtotal: prod.precio * delta,
                 asientos: undefined,
+                esPreorden: false,
+                codigoPreorden: null,
               });
             }
           }
@@ -224,12 +237,16 @@ describe('PosPage Component', () => {
       butacas: [{ idButaca: 1, fila: 'A', numero: 1, codigo: 'A1', estaOcupada: false }],
     });
     (taquillaService.registrarVenta as jest.Mock).mockResolvedValue({
-      idVenta: 100,
-      folio: 'VT-00100',
+      idVenta: 8292,
+      folio: 'VT-8292',
       total: 115,
-      fechaHora: '2026-10-21T18:00:00Z',
+      montoRecibido: 200,
+      cambio: 85,
+      rfcCine: 'CTX-260414-9X0',
+      codigoBarrasTicket: '7501092840192',
+      fechaVenta: '2026-04-16T14:53:46Z',
       metodoPago: 'Efectivo',
-      mensaje: 'OK',
+      items: [],
     });
   });
 
@@ -259,7 +276,7 @@ describe('PosPage Component', () => {
     });
   });
 
-  test('permite agregar productos de dulcería y procesar cobro en efectivo', async () => {
+  test('HU-09 (Mockup 13 y 14): permite agregar productos, calcular cambio en efectivo ($200 recibido -> $150 cambio) y emitir ticket con RFC', async () => {
     render(<PosPage />);
 
     await waitFor(() => {
@@ -273,7 +290,7 @@ describe('PosPage Component', () => {
       expect(screen.getByText('Palomitas Grandes')).toBeInTheDocument();
     });
 
-    // Agregar palomitas al carrito
+    // Agregar palomitas ($50) al carrito
     const botonesAgregar = screen.getAllByRole('button', { name: /Agregar/i });
     fireEvent.click(botonesAgregar[0]);
 
@@ -281,17 +298,77 @@ describe('PosPage Component', () => {
       expect(taquillaService.calcularOrdenPos).toHaveBeenCalled();
     });
 
-    // Ir al Paso 3: Cobro
+    // Ir al Paso 3: Cobro (Mockup 13)
     fireEvent.click(screen.getByRole('button', { name: /Paso 3: Cobrar/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Confirmar Pago en Efectivo/i)).toBeInTheDocument();
+      expect(screen.getByText(/MONTO TOTAL A COBRAR/i)).toBeInTheDocument();
+      // Regla de negocio HU-09: El carrito está bloqueado en el Paso 3
+      expect(screen.getByText(/Resumen bloqueado en Cobro/i)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /Confirmar Pago en Efectivo/i }));
+    // Seleccionar tarjeta PAGO EN EFECTIVO
+    fireEvent.click(screen.getByRole('button', { name: /PAGO EN EFECTIVO/i }));
 
     await waitFor(() => {
-      expect(taquillaService.registrarVenta).toHaveBeenCalled();
+      expect(screen.getByText(/COBRO EN EFECTIVO/i)).toBeInTheDocument();
+    });
+
+    // Seleccionar botón rápido $200
+    fireEvent.click(screen.getByRole('button', { name: '$200' }));
+
+    expect(screen.getByTestId('cambio-calculado')).toHaveTextContent('$150.00');
+
+    // Confirmar e imprimir ticket
+    fireEvent.click(screen.getByRole('button', { name: /REGISTRAR VENTA E IMPRIMIR/i }));
+
+    await waitFor(() => {
+      expect(taquillaService.registrarVenta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metodoPago: 'Efectivo',
+          montoRecibido: 200,
+        })
+      );
+      expect(screen.getByText(/TICKET DE VENTA OFICIAL/i)).toBeInTheDocument();
+      expect(screen.getByText(/RFC: CTX-260414-9X0/i)).toBeInTheDocument();
+    });
+  });
+
+  test('HU-09 (Mockup 13): permite cobrar por TERMINAL MERCADO PAGO ingresando Folio de Autorización / Voucher', async () => {
+    render(<PosPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Spider-Man')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /2\. Dulcería & Combos/i }));
+    const nachosCard = await screen.findByText('Nachos con Queso');
+    fireEvent.click(nachosCard);
+
+    await waitFor(() => {
+      expect(screen.getByText('$65.00')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Paso 3: Cobrar/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /TARJETA MERCADO PAGO/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/TERMINAL MERCADO PAGO/i)).toBeInTheDocument();
+    });
+
+    const inputVoucher = screen.getByLabelText(/Folio de autorización/i);
+    fireEvent.change(inputVoucher, { target: { value: '23423' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /REGISTRAR VENTA E IMPRIMIR/i }));
+
+    await waitFor(() => {
+      expect(taquillaService.registrarVenta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metodoPago: 'Tarjeta Mercado Pago',
+          folioAutorizacion: '23423',
+        })
+      );
     });
   });
 
@@ -367,7 +444,7 @@ describe('PosPage Component', () => {
     });
   });
 
-  test('al canjear una pre-orden QR exige exactamente sus butacas y agrega combos', async () => {
+  test('HU-08: al canjear una pre-orden QR exige exactamente sus butacas, marca las líneas como PRE-ORDEN FIJA y permite agregar productos extra', async () => {
     (taquillaService.getPreorden as jest.Mock).mockResolvedValue(
       crearPreordenMock({
         combos: [{ nombre: 'Combo Pareja', cantidad: 1, precio: 110 }],
@@ -409,10 +486,31 @@ describe('PosPage Component', () => {
       expect(screen.getByText(/Avatar \(19:00\) - Ana López/i)).toBeInTheDocument();
       expect(screen.getByText(/Asientos: A1, A2/i)).toBeInTheDocument();
       expect(screen.getByText('Combo Pareja')).toBeInTheDocument();
+      expect(screen.getAllByText(/PRE-ORDEN FIJA/i).length).toBeGreaterThanOrEqual(2);
     });
   });
 
-  test('rechaza una pre-orden inactiva sin abrir el mapa de butacas', async () => {
+  test('HU-08: rechaza una pre-orden que supera los 12 días de vigencia', async () => {
+    (taquillaService.getPreorden as jest.Mock).mockResolvedValue(
+      crearPreordenMock({
+        idPreorden: 8,
+        codigo: 'PRE-XIL-EXP15',
+        diasTranscurridos: 15,
+        expirada: true,
+        estadoActivo: true,
+      })
+    );
+
+    render(<PosPage />);
+    await escanearQr('PRE-XIL-EXP15');
+
+    await waitFor(() => {
+      expect(screen.getByText(/12 días de vigencia/i)).toBeInTheDocument();
+    });
+    expect(taquillaService.getButacasFuncion).not.toHaveBeenCalled();
+  });
+
+  test('rechaza una pre-orden inactiva o canjeada sin abrir el mapa de butacas', async () => {
     (taquillaService.getPreorden as jest.Mock).mockResolvedValue(
       crearPreordenMock({
         idPreorden: 6,
@@ -425,7 +523,7 @@ describe('PosPage Component', () => {
     await escanearQr('PRE-XIL-002');
 
     await waitFor(() => {
-      expect(screen.getByText(/cancelada o inactiva/i)).toBeInTheDocument();
+      expect(screen.getByText(/cancelada \/ inactiva/i)).toBeInTheDocument();
     });
     expect(taquillaService.getButacasFuncion).not.toHaveBeenCalled();
   });
@@ -462,7 +560,9 @@ describe('PosPage Component', () => {
   });
 
   test('muestra un mensaje cuando la pre-orden no se puede validar', async () => {
-    (taquillaService.getPreorden as jest.Mock).mockRejectedValue(new Error('fallo de red'));
+    (taquillaService.getPreorden as jest.Mock).mockRejectedValue(
+      new Error('Error al validar la pre-orden desde SQL Server.')
+    );
 
     render(<PosPage />);
     await escanearQr('PRE-XIL-003');
