@@ -239,6 +239,22 @@ export interface CrearPreordenDto {
   combos?: CrearPreordenItemDulceriaDto[];
 }
 
+export interface SolicitarCodigoPreordenDto {
+  telefono: string;
+}
+
+export interface SolicitarCodigoPreordenResponseDto {
+  enviado: boolean;
+  telefonoEnmascarado: string;
+  expiraEnMinutos: number;
+  message: string;
+}
+
+export interface VerificarCodigoPreordenDto {
+  telefono: string;
+  codigo: string;
+}
+
 export interface PeriodoDashboardDto {
   fechaInicio: string;
   fechaFin: string;
