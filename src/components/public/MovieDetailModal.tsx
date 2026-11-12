@@ -79,6 +79,40 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
     }
   };
 
+  const renderTrailerContent = () => {
+    if (loadingTrailer) {
+      return (
+        <div className="flex flex-col items-center justify-center text-white space-y-3 p-6 text-center">
+          <i className="fa-solid fa-spinner fa-spin text-2xl text-[#E11D2F]" />
+          <span className="text-xs uppercase font-mono tracking-widest text-[#A0A0A0]">
+            Cargando tráiler oficial de {movie.title}...
+          </span>
+        </div>
+      );
+    }
+
+    if (selectedTrailerKey) {
+      return (
+        <iframe
+          src={`https://www.youtube.com/embed/${selectedTrailerKey}?autoplay=1&rel=0&modestbranding=1`}
+          title={`Tráiler de ${movie.title}`}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+          className="w-full h-full border-0 absolute inset-0"
+        />
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center text-white space-y-2 p-6 text-center">
+        <i className="fa-solid fa-triangle-exclamation text-2xl text-[#DCA54C]" />
+        <p className="text-sm font-bold">No hay tráiler disponible para esta función</p>
+        <p className="text-xs text-[#A0A0A0]">Consulta horarios y disponibilidad en taquilla física.</p>
+      </div>
+    );
+  };
+
   return (
     <>
       <dialog
@@ -276,29 +310,7 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
 
           {/* Contenedor del Video en Proporción 16:9 */}
           <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-[#262626] flex items-center justify-center">
-            {loadingTrailer ? (
-              <div className="flex flex-col items-center justify-center text-white space-y-3 p-6 text-center">
-                <i className="fa-solid fa-spinner fa-spin text-2xl text-[#E11D2F]" />
-                <span className="text-xs uppercase font-mono tracking-widest text-[#A0A0A0]">
-                  Cargando tráiler oficial de {movie.title}...
-                </span>
-              </div>
-            ) : selectedTrailerKey ? (
-              <iframe
-                src={`https://www.youtube.com/embed/${selectedTrailerKey}?autoplay=1&rel=0&modestbranding=1`}
-                title={`Tráiler de ${movie.title}`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-                className="w-full h-full border-0 absolute inset-0"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center text-white space-y-2 p-6 text-center">
-                <i className="fa-solid fa-triangle-exclamation text-2xl text-[#DCA54C]" />
-                <p className="text-sm font-bold">No hay tráiler disponible para esta función</p>
-                <p className="text-xs text-[#A0A0A0]">Consulta horarios y disponibilidad en taquilla física.</p>
-              </div>
-            )}
+            {renderTrailerContent()}
           </div>
 
           {/* Pie del Reproductor con Acciones Rápidas */}
