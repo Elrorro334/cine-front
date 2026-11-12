@@ -285,9 +285,10 @@ export default function MovieDetailModal({ movie, isOpen, onClose }: MovieDetail
               </div>
             ) : selectedTrailerKey ? (
               <iframe
-                src={`https://www.youtube-nocookie.com/embed/${selectedTrailerKey}?autoplay=1&rel=0&modestbranding=1`}
+                src={`https://www.youtube.com/embed/${selectedTrailerKey}?autoplay=1&rel=0&modestbranding=1`}
                 title={`Tráiler de ${movie.title}`}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
                 allowFullScreen
                 className="w-full h-full border-0 absolute inset-0"
               />
