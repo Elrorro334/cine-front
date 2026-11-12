@@ -1,8 +1,64 @@
-:root{--xilotzin-primary:#E11D2F;--xilotzin-secondary:#DCA54C;--xilotzin-bg:#0A0A0A;--xilotzin-surface:#121212;--xilotzin-border:#262626;--xilotzin-text:#F5F5F5}
-.public-theme-root{background-color:var(--xilotzin-bg);color:var(--xilotzin-text)}
-.public-theme-marquee{background:linear-gradient(90deg,#E11D2F,#b91c1c,#E11D2F)!important;border-bottom-color:rgba(225,29,47,.5)!important}
-.public-theme-hero-glow{background:linear-gradient(90deg,rgba(225,29,47,.25),transparent,rgba(220,165,76,.12))!important}
-.public-theme-divider{background-color:#E11D2F!important;box-shadow:0 8px 20px rgba(225,29,47,.5)!important}
-.public-theme-card{background-color:#121212!important;border-color:#262626!important}
-.public-theme-card:hover{border-color:rgba(225,29,47,.55)!important;box-shadow:0 20px 40px rgba(225,29,47,.25)!important}
-.public-theme-footer-bar{background:linear-gradient(90deg,#ffffff,#E11D2F,#ffffff)!important}
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap');
+
+:root {
+  --theme-primary: #E11D2F;
+  --theme-primary-hover: #B91423;
+  --theme-bg: #0A0A0A;
+  --theme-card: #141414;
+  --theme-border: #262626;
+  --theme-text: #E0E0E0;
+  --theme-muted: #A0A0A0;
+  --theme-accent: #DCA54C;
+  --theme-glow: rgba(225, 29, 47, 0.4);
+}
+
+body, body.theme-traditional, body.theme-classic, [data-cine-theme="theme-traditional"], [data-cine-theme="theme-classic"] {
+  background-color: #0A0A0A !important;
+  color: #E0E0E0 !important;
+  background-image:
+    radial-gradient(circle at 50% 15%, rgba(225, 29, 47, 0.35) 0%, transparent 55%),
+    radial-gradient(circle at 10% 85%, rgba(220, 165, 76, 0.2) 0%, transparent 45%),
+    linear-gradient(180deg, #0A0A0A 0%, #151515 100%) !important;
+}
+
+body.theme-traditional .font-serif,
+body.theme-traditional h1,
+body.theme-traditional h2,
+body.theme-traditional h3,
+body.theme-traditional .theme-heading,
+body.theme-classic .font-serif,
+body.theme-classic h1,
+body.theme-classic h2,
+body.theme-classic h3,
+body.theme-classic .theme-heading {
+  font-family: 'Playfair Display', serif !important;
+  letter-spacing: 0.05em !important;
+  text-shadow: 0 0 15px rgba(225, 29, 47, 0.4), 0 0 25px rgba(220, 165, 76, 0.3) !important;
+}
+
+body.theme-traditional header,
+body.theme-classic header {
+  background-color: rgba(10, 10, 10, 0.97) !important;
+  border-bottom: 2px solid #E11D2F !important;
+  box-shadow: 0 10px 30px rgba(225, 29, 47, 0.3) !important;
+}
+
+body.theme-traditional .theme-marquee-bar,
+body.theme-classic .theme-marquee-bar,
+.public-theme-marquee {
+  background: linear-gradient(90deg, #180305, #35070c, #180305) !important;
+  color: #FCD34D !important;
+  border-bottom: 1px solid #E11D2F !important;
+}
+
+body.theme-traditional .public-theme-card:hover,
+body.theme-classic .public-theme-card:hover {
+  border-color: #E11D2F !important;
+  box-shadow: 0 20px 40px rgba(225, 29, 47, 0.35), 0 0 25px rgba(220, 165, 76, 0.2) !important;
+}
+
+.theme-card-badge {
+  background: #E11D2F !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255,255,255,0.3) !important;
+}

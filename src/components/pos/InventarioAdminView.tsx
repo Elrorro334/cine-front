@@ -1,9 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { InsumoInventarioDto, EntradaHistorialDto } from '@/types/inventario';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  InsumoInventarioDto,
+  EntradaHistorialDto,
+  EstadoStockFiltro,
+  OrdenInventario,
+} from '@/types/inventario';
 import { inventarioService } from '@/services/inventarioService';
 import RegistrarEntradaModal from './RegistrarEntradaModal';
+
+const TAMANO_PAGINA = 15;
+const CATEGORIAS_INICIALES = ['Snacks', 'Bebidas', 'Dulces', 'Comida', 'Pizzas'];
+
+type PageToken = number | 'ellipsis-left' | 'ellipsis-right';
 
 function getMargenBadgeClass(margen: number): string {
   if (margen >= 60) {
@@ -16,26 +26,72 @@ function getMargenBadgeClass(margen: number): string {
 }
 
 function getExpandIcon(isExpanded: boolean): string {
-  if (isExpanded) return 'fa-chevron-up';
-  return 'fa-chevron-down';
+  return isExpanded ? 'fa-chevron-up' : 'fa-chevron-down';
 }
 
 function getExpandText(isExpanded: boolean): string {
-  if (isExpanded) return 'Ocultar';
-  return 'Ver líneas';
+  return isExpanded ? 'Ocultar' : 'Ver líneas';
 }
 
 function getPreviewMargenClass(margen: number): string {
-  if (margen >= 0) return 'text-emerald-400';
-  return 'text-red-400';
+  return margen >= 0 ? 'text-emerald-400' : 'text-red-400';
+}
+
+function buildPageNumbers(currentPage: number, totalPages: number): PageToken[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, idx) => idx + 1);
+  }
+
+  const tokens: PageToken[] = [1];
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(totalPages - 1, currentPage + 1);
+
+  if (start > 2) {
+    tokens.push('ellipsis-left');
+  }
+  for (let p = start; p <= end; p++) {
+    tokens.push(p);
+  }
+  if (end < totalPages - 1) {
+    tokens.push('ellipsis-right');
+  }
+  tokens.push(totalPages);
+
+  return tokens;
+}
+
+function formatRangeText(paginaActual: number, tamanoPagina: number, totalRegistros: number): string {
+  if (totalRegistros === 0) {
+    return 'Mostrando 0 de 0 insumos';
+  }
+  const inicio = (paginaActual - 1) * tamanoPagina + 1;
+  const fin = Math.min(paginaActual * tamanoPagina, totalRegistros);
+  return `Mostrando ${inicio.toLocaleString('es-MX')}–${fin.toLocaleString('es-MX')} de ${totalRegistros.toLocaleString('es-MX')} insumos`;
 }
 
 export default function InventarioAdminView() {
   const [insumos, setInsumos] = useState<InsumoInventarioDto[]>([]);
+  const [catalogoInsumos, setCatalogoInsumos] = useState<InsumoInventarioDto[]>([]);
   const [entradas, setEntradas] = useState<EntradaHistorialDto[]>([]);
+  const [categoriasDisponibles, setCategoriasDisponibles] = useState<string[]>(CATEGORIAS_INICIALES);
+
+  // Filtros, búsqueda, ordenamiento y paginación sincronizados con el backend
   const [selectedCategoria, setSelectedCategoria] = useState<string>('Todas');
-  const [busqueda, setBusqueda] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
+  const [estadoStock, setEstadoStock] = useState<EstadoStockFiltro>('todos');
+  const [ordenarPor, setOrdenarPor] = useState<OrdenInventario>('categoria_nombre');
+  const [busquedaInput, setBusquedaInput] = useState<string>('');
+  const [busquedaAplicada, setBusquedaAplicada] = useState<string>('');
+  const [pagina, setPagina] = useState<number>(1);
+
+  // Metadatos de paginación y alertas calculados en servidor
+  const [totalRegistros, setTotalRegistros] = useState<number>(0);
+  const [totalPaginas, setTotalPaginas] = useState<number>(1);
+  const [totalEnAlerta, setTotalEnAlerta] = useState<number>(0);
+  const [totalAgotados, setTotalAgotados] = useState<number>(0);
+
+  // Estados de carga y modales
+  const [loadingInsumos, setLoadingInsumos] = useState<boolean>(true);
+  const [loadingEntradas, setLoadingEntradas] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<InsumoInventarioDto | null>(null);
   const [editCosto, setEditCosto] = useState<string>('');
@@ -44,54 +100,196 @@ export default function InventarioAdminView() {
   const [editError, setEditError] = useState<string | null>(null);
   const [expandedFacturaId, setExpandedFacturaId] = useState<number | null>(null);
 
-  const categorias = ['Todas', 'Snacks', 'Bebidas', 'Dulces', 'Comida'];
+  // Debounce del buscador (300ms) para evitar peticiones redundantes al backend
+  useEffect(() => {
+    const trimmed = busquedaInput.trim();
+    if (trimmed === busquedaAplicada) return;
 
-  const cargarDatos = useCallback(async () => {
-    setLoading(true);
+    const timer = setTimeout(() => {
+      setLoadingInsumos(true);
+      setBusquedaAplicada(trimmed);
+      setPagina(1);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [busquedaInput, busquedaAplicada]);
+
+  const aplicarRespuestaPaginada = useCallback(
+    (data: Awaited<ReturnType<typeof inventarioService.getInsumosPaginado>>) => {
+      setInsumos(data.items);
+      setTotalRegistros(data.totalRegistros);
+      setTotalPaginas(Math.max(1, data.totalPaginas));
+      setTotalEnAlerta(data.totalEnAlerta);
+      setTotalAgotados(data.totalAgotados);
+      if (data.categoriasDisponibles && data.categoriasDisponibles.length > 0) {
+        setCategoriasDisponibles(data.categoriasDisponibles);
+      }
+      if (data.paginaActual > 0 && data.paginaActual !== pagina) {
+        setPagina(data.paginaActual);
+      }
+    },
+    [pagina]
+  );
+
+  const recargarPaginaInsumos = useCallback(async () => {
+    setLoadingInsumos(true);
     try {
-      const [insumosData, entradasData] = await Promise.all([
-        inventarioService.getInsumos({
-          categoria: selectedCategoria !== 'Todas' ? selectedCategoria : undefined,
-          busqueda: busqueda.trim() ? busqueda.trim() : undefined,
-        }),
-        inventarioService.getHistorialEntradas(20),
-      ]);
-      setInsumos(insumosData);
-      setEntradas(entradasData);
+      const data = await inventarioService.getInsumosPaginado({
+        categoria: selectedCategoria !== 'Todas' ? selectedCategoria : undefined,
+        busqueda: busquedaAplicada || undefined,
+        estadoStock,
+        ordenarPor,
+        pagina,
+        tamanoPagina: TAMANO_PAGINA,
+      });
+      aplicarRespuestaPaginada(data);
     } catch (err) {
-      console.error('Error al cargar datos del inventario:', err);
+      console.error('Error al cargar inventario paginado:', err);
     } finally {
-      setLoading(false);
+      setLoadingInsumos(false);
     }
-  }, [selectedCategoria, busqueda]);
+  }, [selectedCategoria, busquedaAplicada, estadoStock, ordenarPor, pagina, aplicarRespuestaPaginada]);
+
+  const recargarDatosSecundarios = useCallback(async () => {
+    setLoadingEntradas(true);
+    try {
+      const [entradasData, catalogoData] = await Promise.all([
+        inventarioService.getHistorialEntradas(20),
+        inventarioService.getInsumos(),
+      ]);
+      setEntradas(entradasData);
+      setCatalogoInsumos(catalogoData);
+    } catch (err) {
+      console.error('Error al cargar historial o catálogo completo:', err);
+    } finally {
+      setLoadingEntradas(false);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
-    Promise.all([
-      inventarioService.getInsumos({
+    inventarioService
+      .getInsumosPaginado({
         categoria: selectedCategoria !== 'Todas' ? selectedCategoria : undefined,
-        busqueda: busqueda.trim() ? busqueda.trim() : undefined,
-      }),
-      inventarioService.getHistorialEntradas(20),
-    ])
-      .then(([insumosData, entradasData]) => {
+        busqueda: busquedaAplicada || undefined,
+        estadoStock,
+        ordenarPor,
+        pagina,
+        tamanoPagina: TAMANO_PAGINA,
+      })
+      .then((data) => {
         if (isMounted) {
-          setInsumos(insumosData);
-          setEntradas(entradasData);
-          setLoading(false);
+          aplicarRespuestaPaginada(data);
+          setLoadingInsumos(false);
         }
       })
       .catch((err) => {
         if (isMounted) {
-          console.error('Error al cargar datos del inventario:', err);
-          setLoading(false);
+          console.error('Error al cargar inventario paginado:', err);
+          setLoadingInsumos(false);
         }
       });
 
     return () => {
       isMounted = false;
     };
-  }, [selectedCategoria, busqueda]);
+  }, [selectedCategoria, busquedaAplicada, estadoStock, ordenarPor, pagina, aplicarRespuestaPaginada]);
+
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([inventarioService.getHistorialEntradas(20), inventarioService.getInsumos()])
+      .then(([entradasData, catalogoData]) => {
+        if (isMounted) {
+          setEntradas(entradasData);
+          setCatalogoInsumos(catalogoData);
+          setLoadingEntradas(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          console.error('Error al cargar historial o catálogo completo:', err);
+          setLoadingEntradas(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSuccessEntrada = useCallback(async () => {
+    await Promise.all([recargarPaginaInsumos(), recargarDatosSecundarios()]);
+  }, [recargarPaginaInsumos, recargarDatosSecundarios]);
+
+  const handleSelectCategoria = (cat: string) => {
+    if (cat === selectedCategoria && pagina === 1) return;
+    setLoadingInsumos(true);
+    setSelectedCategoria(cat);
+    setPagina(1);
+  };
+
+  const handleSelectEstadoStock = (estado: EstadoStockFiltro) => {
+    if (estado === estadoStock && pagina === 1) return;
+    setLoadingInsumos(true);
+    setEstadoStock(estado);
+    setPagina(1);
+  };
+
+  const handleChangeOrden = (orden: OrdenInventario) => {
+    if (orden === ordenarPor && pagina === 1) return;
+    setLoadingInsumos(true);
+    setOrdenarPor(orden);
+    setPagina(1);
+  };
+
+  const handleChangePagina = (nuevaPagina: number) => {
+    if (nuevaPagina === pagina || nuevaPagina < 1 || nuevaPagina > totalPaginas) return;
+    setLoadingInsumos(true);
+    setPagina(nuevaPagina);
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = busquedaInput.trim();
+    if (trimmed === busquedaAplicada && pagina === 1) return;
+    setLoadingInsumos(true);
+    setBusquedaAplicada(trimmed);
+    setPagina(1);
+  };
+
+  const handleClearSearch = () => {
+    setBusquedaInput('');
+    if (busquedaAplicada === '' && pagina === 1) return;
+    setLoadingInsumos(true);
+    setBusquedaAplicada('');
+    setPagina(1);
+  };
+
+  const handleResetFiltros = () => {
+    setLoadingInsumos(true);
+    setSelectedCategoria('Todas');
+    setEstadoStock('todos');
+    setOrdenarPor('categoria_nombre');
+    setBusquedaInput('');
+    setBusquedaAplicada('');
+    setPagina(1);
+  };
+
+  const hayFiltrosActivos =
+    selectedCategoria !== 'Todas' ||
+    estadoStock !== 'todos' ||
+    ordenarPor !== 'categoria_nombre' ||
+    busquedaAplicada.length > 0;
+
+  const categoriasPills = useMemo(
+    () => ['Todas', ...categoriasDisponibles],
+    [categoriasDisponibles]
+  );
+
+  const pageTokens = useMemo(
+    () => buildPageNumbers(pagina, totalPaginas),
+    [pagina, totalPaginas]
+  );
 
   const handleOpenEdit = (item: InsumoInventarioDto) => {
     setEditingItem(item);
@@ -137,11 +335,14 @@ export default function InventarioAdminView() {
         precioVenta: precioNum,
       });
 
-      // Actualizar estado local con el cálculo de margen devuelto por el backend (Criterio 3)
       setInsumos((prev) =>
         prev.map((item) => (item.idProducto === updated.idProducto ? updated : item))
       );
+      setCatalogoInsumos((prev) =>
+        prev.map((item) => (item.idProducto === updated.idProducto ? updated : item))
+      );
       handleCloseEdit();
+      void recargarPaginaInsumos();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al actualizar precios';
       setEditError(msg);
@@ -159,7 +360,7 @@ export default function InventarioAdminView() {
   }
 
   const renderInsumosBody = () => {
-    if (loading) {
+    if (loadingInsumos) {
       return (
         <tr>
           <td colSpan={9} className="py-12 text-center text-[#737373]">
@@ -173,8 +374,17 @@ export default function InventarioAdminView() {
     if (insumos.length === 0) {
       return (
         <tr>
-          <td colSpan={9} className="py-10 text-center text-[#737373]">
-            No se encontraron insumos con los filtros seleccionados.
+          <td colSpan={9} className="py-10 text-center text-[#737373] space-y-3">
+            <p>No se encontraron insumos con los filtros seleccionados.</p>
+            {hayFiltrosActivos && (
+              <button
+                type="button"
+                onClick={handleResetFiltros}
+                className="px-3.5 py-1.5 rounded-xl bg-[#1f1f1f] hover:bg-[#2a2a2a] text-white text-xs font-semibold border border-[#333333] transition-colors"
+              >
+                <i className="fa-solid fa-rotate-left mr-1.5" /> Limpiar filtros
+              </button>
+            )}
           </td>
         </tr>
       );
@@ -219,7 +429,8 @@ export default function InventarioAdminView() {
             </span>
             {item.enAlerta && (
               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1 mt-1">
-                <i className="fa-solid fa-triangle-exclamation text-[8px]" /> Desabasto
+                <i className="fa-solid fa-triangle-exclamation text-[8px]" />
+                {item.stockActual === 0 ? 'Agotado' : 'Desabasto'}
               </span>
             )}
           </div>
@@ -252,7 +463,7 @@ export default function InventarioAdminView() {
   };
 
   const renderEntradasBody = () => {
-    if (loading) {
+    if (loadingEntradas) {
       return (
         <tr>
           <td colSpan={5} className="py-8 text-center text-[#737373]">
@@ -358,13 +569,7 @@ export default function InventarioAdminView() {
       {/* Encabezado y Acción Principal */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#262626] pb-6">
         <div>
-          <div className="flex items-center gap-3">
-            <span className="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase bg-[#D81B60]/10 text-[#D81B60] border border-[#D81B60]/30">
-              HU-11 Módulo Administrativo
-            </span>
-            <span className="text-xs text-[#a3a3a3]">Sprint 2 • Nov 05, 2026</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-white">
             Gestión de Inventario Maestro y Registro de Entradas
           </h1>
           <p className="text-xs text-[#a3a3a3] mt-0.5">
@@ -383,44 +588,149 @@ export default function InventarioAdminView() {
       </div>
 
       {/* Barra de Filtros y Búsqueda */}
-      <div className="bg-[#111111] p-4 rounded-2xl border border-[#262626] flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Pills de Categorías Preexistentes */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-          {categorias.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategoria(cat)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                selectedCategoria === cat
-                  ? 'bg-white text-black shadow-md'
-                  : 'bg-[#1a1a1a] text-[#a3a3a3] hover:text-white hover:bg-[#262626]'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+      <div className="bg-[#111111] p-4 rounded-2xl border border-[#262626] space-y-3">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          {/* Pills de Categorías Dinámicas del Backend */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+            {categoriasPills.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => handleSelectCategoria(cat)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  selectedCategoria === cat
+                    ? 'bg-white text-black shadow-md'
+                    : 'bg-[#1a1a1a] text-[#a3a3a3] hover:text-white hover:bg-[#262626]'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Buscador Funcional con Submit, Debounce y Botón Limpiar */}
+          <form onSubmit={handleSearchSubmit} className="relative w-full lg:w-96">
+            <label htmlFor="search-insumos" className="sr-only">
+              Buscar por SKU, Producto o Categoría
+            </label>
+            <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-[#737373] text-xs" />
+            <input
+              id="search-insumos"
+              type="text"
+              placeholder="Buscar por SKU, Producto o Categoría..."
+              value={busquedaInput}
+              onChange={(e) => setBusquedaInput(e.target.value)}
+              className="w-full bg-[#171717] border border-[#2a2a2a] rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder-[#525252] focus:outline-none focus:border-[#D81B60]"
+            />
+            {busquedaInput.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#737373] hover:text-white p-1"
+              >
+                <i className="fa-solid fa-xmark text-xs" />
+              </button>
+            )}
+          </form>
         </div>
 
-        {/* Buscador de Insumos */}
-        <div className="relative w-full md:w-80">
-          <label htmlFor="search-insumos" className="sr-only">
-            Buscar por SKU o Producto
-          </label>
-          <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-[#737373] text-xs" />
-          <input
-            id="search-insumos"
-            type="text"
-            placeholder="Buscar por SKU o Producto..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full bg-[#171717] border border-[#2a2a2a] rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder-[#525252] focus:outline-none focus:border-[#D81B60]"
-          />
+        {/* Fila 2: Filtros de Estado de Stock (Alertas/Agotados), Ordenamiento y Limpiar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-3 border-t border-[#1e1e1e]">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-[#737373] font-semibold uppercase tracking-wider mr-1">
+              Estado:
+            </span>
+            <button
+              type="button"
+              onClick={() => handleSelectEstadoStock('todos')}
+              className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                estadoStock === 'todos'
+                  ? 'bg-[#D81B60] text-white'
+                  : 'bg-[#181818] text-[#a3a3a3] hover:text-white'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectEstadoStock('alerta')}
+              className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1.5 ${
+                estadoStock === 'alerta'
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-[#181818] text-amber-400 hover:bg-amber-950/40 border border-amber-500/20'
+              }`}
+            >
+              <i className="fa-solid fa-triangle-exclamation text-[10px]" />
+              <span>En Alerta</span>
+              <span className="font-mono text-[10px] opacity-85">({totalEnAlerta})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectEstadoStock('agotado')}
+              className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1.5 ${
+                estadoStock === 'agotado'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-[#181818] text-red-400 hover:bg-red-950/40 border border-red-500/20'
+              }`}
+            >
+              <i className="fa-solid fa-circle-xmark text-[10px]" />
+              <span>Agotados</span>
+              <span className="font-mono text-[10px] opacity-85">({totalAgotados})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectEstadoStock('optimo')}
+              className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1.5 ${
+                estadoStock === 'optimo'
+                  ? 'bg-emerald-500 text-black'
+                  : 'bg-[#181818] text-emerald-400 hover:bg-emerald-950/40 border border-emerald-500/20'
+              }`}
+            >
+              <i className="fa-solid fa-circle-check text-[10px]" />
+              <span>Stock Óptimo</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <label htmlFor="select-orden-inventario" className="text-[11px] text-[#737373] font-semibold uppercase tracking-wider">
+              Ordenar:
+            </label>
+            <select
+              id="select-orden-inventario"
+              value={ordenarPor}
+              onChange={(e) => handleChangeOrden(e.target.value as OrdenInventario)}
+              className="bg-[#171717] border border-[#2a2a2a] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#D81B60]"
+            >
+              <option value="categoria_nombre">Categoría y Nombre (A-Z)</option>
+              <option value="producto_asc">Producto (A-Z)</option>
+              <option value="producto_desc">Producto (Z-A)</option>
+              <option value="sku_asc">SKU (Ascendente)</option>
+              <option value="stock_asc">Stock: Menor a Mayor</option>
+              <option value="stock_desc">Stock: Mayor a Menor</option>
+              <option value="margen_asc">Margen (%): Menor a Mayor</option>
+              <option value="margen_desc">Margen (%): Mayor a Menor</option>
+              <option value="precio_asc">Precio: Menor a Mayor</option>
+              <option value="precio_desc">Precio: Mayor a Menor</option>
+            </select>
+
+            {hayFiltrosActivos && (
+              <button
+                type="button"
+                onClick={handleResetFiltros}
+                className="px-3 py-1.5 rounded-xl bg-[#1a1a1a] hover:bg-[#262626] text-[#d4d4d4] hover:text-white text-xs font-medium border border-[#2e2e2e] transition-colors"
+              >
+                <i className="fa-solid fa-filter-circle-xmark mr-1.5 text-[11px]" />
+                Limpiar
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* SECCIÓN 1: TABLA 1 - INVENTARIO MAESTRO DE INSUMOS (8 COLUMNAS EXACTAS) */}
+      {/* SECCIÓN 1: TABLA 1 - INVENTARIO MAESTRO DE INSUMOS (8 COLUMNAS EXACTAS + PAGINACIÓN DE 15) */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <i className="fa-solid fa-boxes-stacked text-[#D81B60]" />
             <h2 className="text-base font-bold text-white tracking-wide">
@@ -428,7 +738,7 @@ export default function InventarioAdminView() {
             </h2>
           </div>
           <span className="text-xs text-[#737373] font-mono">
-            {insumos.length} insumos registrados
+            {totalRegistros.toLocaleString('es-MX')} insumos encontrados
           </span>
         </div>
 
@@ -452,6 +762,80 @@ export default function InventarioAdminView() {
                 {renderInsumosBody()}
               </tbody>
             </table>
+          </div>
+
+          {/* Barra de Paginación (15 registros por página) */}
+          <div className="bg-[#141414] border-t border-[#262626] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-xs text-[#a3a3a3] font-mono">
+              {formatRangeText(pagina, TAMANO_PAGINA, totalRegistros)}
+              <span className="text-[#737373] ml-2">
+                (Página {pagina} de {totalPaginas})
+              </span>
+            </div>
+
+            <nav aria-label="Paginación de inventario" className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => handleChangePagina(1)}
+                disabled={pagina <= 1 || loadingInsumos}
+                aria-label="Primera página"
+                className="px-2.5 py-1.5 rounded-lg bg-[#1c1c1c] border border-[#2c2c2c] text-xs text-[#d4d4d4] hover:bg-[#262626] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <i className="fa-solid fa-angles-left" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChangePagina(Math.max(1, pagina - 1))}
+                disabled={pagina <= 1 || loadingInsumos}
+                aria-label="Página anterior"
+                className="px-2.5 py-1.5 rounded-lg bg-[#1c1c1c] border border-[#2c2c2c] text-xs text-[#d4d4d4] hover:bg-[#262626] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <i className="fa-solid fa-chevron-left" />
+              </button>
+
+              {pageTokens.map((token) =>
+                typeof token === 'number' ? (
+                  <button
+                    key={token}
+                    type="button"
+                    onClick={() => handleChangePagina(token)}
+                    disabled={loadingInsumos}
+                    aria-label={`Página ${token}`}
+                    aria-current={token === pagina ? 'page' : undefined}
+                    className={`min-w-[32px] px-2.5 py-1.5 rounded-lg text-xs font-mono font-semibold transition-colors ${
+                      token === pagina
+                        ? 'bg-[#D81B60] text-white shadow-sm'
+                        : 'bg-[#1c1c1c] border border-[#2c2c2c] text-[#a3a3a3] hover:text-white hover:bg-[#262626]'
+                    }`}
+                  >
+                    {token}
+                  </button>
+                ) : (
+                  <span key={token} className="px-1.5 text-xs text-[#737373] select-none">
+                    ...
+                  </span>
+                )
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleChangePagina(Math.min(totalPaginas, pagina + 1))}
+                disabled={pagina >= totalPaginas || loadingInsumos}
+                aria-label="Página siguiente"
+                className="px-2.5 py-1.5 rounded-lg bg-[#1c1c1c] border border-[#2c2c2c] text-xs text-[#d4d4d4] hover:bg-[#262626] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <i className="fa-solid fa-chevron-right" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChangePagina(totalPaginas)}
+                disabled={pagina >= totalPaginas || loadingInsumos}
+                aria-label="Última página"
+                className="px-2.5 py-1.5 rounded-lg bg-[#1c1c1c] border border-[#2c2c2c] text-xs text-[#d4d4d4] hover:bg-[#262626] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <i className="fa-solid fa-angles-right" />
+              </button>
+            </nav>
           </div>
         </div>
       </div>
@@ -595,8 +979,8 @@ export default function InventarioAdminView() {
       <RegistrarEntradaModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={cargarDatos}
-        insumosDisponibles={insumos}
+        onSuccess={handleSuccessEntrada}
+        insumosDisponibles={catalogoInsumos.length > 0 ? catalogoInsumos : insumos}
       />
     </div>
   );

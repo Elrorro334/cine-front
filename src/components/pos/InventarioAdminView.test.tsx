@@ -1,11 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import InventarioAdminView from './InventarioAdminView';
 import { inventarioService } from '@/services/inventarioService';
-import { InsumoInventarioDto, EntradaHistorialDto } from '@/types/inventario';
+import {
+  InsumoInventarioDto,
+  EntradaHistorialDto,
+  InventarioPaginadoDto,
+} from '@/types/inventario';
 
 jest.mock('@/services/inventarioService', () => ({
   inventarioService: {
     getInsumos: jest.fn(),
+    getInsumosPaginado: jest.fn(),
     actualizarPrecios: jest.fn(),
     getHistorialEntradas: jest.fn(),
     registrarEntrada: jest.fn(),
@@ -47,7 +52,7 @@ describe('InventarioAdminView Component (HU-11)', () => {
       idProducto: 3,
       sku: '7501006',
       producto: 'Pizza Personal Pepperoni',
-      categoria: 'Comida',
+      categoria: 'Pizzas',
       stockActual: 40,
       minimoAlerta: 10,
       costoUnitario: 25.0,
@@ -58,6 +63,17 @@ describe('InventarioAdminView Component (HU-11)', () => {
       icono: 'fa-pizza-slice',
     },
   ];
+
+  const mockPaginado: InventarioPaginadoDto = {
+    items: mockInsumos,
+    paginaActual: 1,
+    tamanoPagina: 15,
+    totalRegistros: 3,
+    totalPaginas: 1,
+    totalEnAlerta: 1,
+    totalAgotados: 0,
+    categoriasDisponibles: ['Bebidas', 'Comida', 'Dulces', 'Pizzas', 'Snacks'],
+  };
 
   const mockEntradas: EntradaHistorialDto[] = [
     {
@@ -85,6 +101,7 @@ describe('InventarioAdminView Component (HU-11)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (inventarioService.getInsumos as jest.Mock).mockResolvedValue(mockInsumos);
+    (inventarioService.getInsumosPaginado as jest.Mock).mockResolvedValue(mockPaginado);
     (inventarioService.getHistorialEntradas as jest.Mock).mockResolvedValue(mockEntradas);
     (inventarioService.getProveedores as jest.Mock).mockResolvedValue([
       { idProveedor: 1, nombre: 'Distribuidora Central de Dulces' },
@@ -128,7 +145,6 @@ describe('InventarioAdminView Component (HU-11)', () => {
       expect(screen.getByText('Nachos con Queso')).toBeInTheDocument();
     });
 
-    // Nachos tiene enAlerta = true -> debe tener el badge "Desabasto"
     const badges = screen.getAllByText(/Desabasto/i);
     expect(badges.length).toBeGreaterThanOrEqual(1);
   });
@@ -169,13 +185,10 @@ describe('InventarioAdminView Component (HU-11)', () => {
       expect(screen.getByText('Editar Precios y Costos')).toBeInTheDocument();
     });
 
-    // Modificar valores
     const inputs = screen.getAllByRole('spinbutton');
-    // inputs[0] = Costo Unitario, inputs[1] = Precio de Venta
     fireEvent.change(inputs[0], { target: { value: '20' } });
     fireEvent.change(inputs[1], { target: { value: '80' } });
 
-    // Guardar
     fireEvent.click(screen.getByText('Guardar y Recalcular'));
 
     await waitFor(() => {
@@ -186,18 +199,108 @@ describe('InventarioAdminView Component (HU-11)', () => {
     });
   });
 
-  test('Filtro de categorías preexistentes interactúa y recarga datos', async () => {
+  test('Filtro de categorías dinámicas (incluyendo Pizzas) solicita datos paginados al backend', async () => {
     render(<InventarioAdminView />);
 
     await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Pizzas' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Snacks' })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Snacks' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pizzas' }));
 
     await waitFor(() => {
-      expect(inventarioService.getInsumos).toHaveBeenCalledWith(
-        expect.objectContaining({ categoria: 'Snacks' })
+      expect(inventarioService.getInsumosPaginado).toHaveBeenCalledWith(
+        expect.objectContaining({
+          categoria: 'Pizzas',
+          pagina: 1,
+          tamanoPagina: 15,
+        })
+      );
+    });
+  });
+
+  test('Paginación de 15 registros por página navega entre páginas correctamente', async () => {
+    (inventarioService.getInsumosPaginado as jest.Mock).mockResolvedValue({
+      ...mockPaginado,
+      totalRegistros: 32,
+      totalPaginas: 3,
+      paginaActual: 1,
+    });
+
+    render(<InventarioAdminView />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Página 1 de 3/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Página 2' }));
+
+    await waitFor(() => {
+      expect(inventarioService.getInsumosPaginado).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pagina: 2,
+          tamanoPagina: 15,
+        })
+      );
+    });
+  });
+
+  test('Buscador aplica búsqueda al enviar y limpia con el botón limpiar', async () => {
+    render(<InventarioAdminView />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/Buscar por SKU, Producto o Categoría/i)).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/Buscar por SKU, Producto o Categoría/i);
+    fireEvent.change(searchInput, { target: { value: '7501001' } });
+    fireEvent.submit(searchInput.closest('form')!);
+
+    await waitFor(() => {
+      expect(inventarioService.getInsumosPaginado).toHaveBeenCalledWith(
+        expect.objectContaining({
+          busqueda: '7501001',
+          pagina: 1,
+        })
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
+
+    await waitFor(() => {
+      expect(searchInput).toHaveValue('');
+    });
+  });
+
+  test('Filtros de estado de stock y ordenamiento envían parámetros al backend', async () => {
+    render(<InventarioAdminView />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /En Alerta/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /En Alerta/i }));
+
+    await waitFor(() => {
+      expect(inventarioService.getInsumosPaginado).toHaveBeenCalledWith(
+        expect.objectContaining({
+          estadoStock: 'alerta',
+          pagina: 1,
+        })
+      );
+    });
+
+    const sortSelect = screen.getByLabelText(/Ordenar/i);
+    fireEvent.change(sortSelect, { target: { value: 'stock_asc' } });
+
+    await waitFor(() => {
+      expect(inventarioService.getInsumosPaginado).toHaveBeenCalledWith(
+        expect.objectContaining({
+          estadoStock: 'alerta',
+          ordenarPor: 'stock_asc',
+          pagina: 1,
+        })
       );
     });
   });

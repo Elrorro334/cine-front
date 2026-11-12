@@ -1,6 +1,9 @@
 import { apiFetch } from '@/lib/apiClient';
 import {
   InsumoInventarioDto,
+  InventarioPaginadoDto,
+  EstadoStockFiltro,
+  OrdenInventario,
   ActualizarPreciosDto,
   EntradaHistorialDto,
   RegistrarEntradaDto,
@@ -13,7 +16,7 @@ import {
  */
 export const inventarioService = {
   /**
-   * Obtiene el listado maestro de insumos con las 8 columnas requeridas y cálculo de margen
+   * Obtiene el listado maestro completo de insumos (usado para catálogos completos y modales)
    */
   async getInsumos(params?: {
     categoria?: string;
@@ -30,6 +33,43 @@ export const inventarioService = {
     const qs = query.toString();
     const endpoint = qs ? `/inventario/insumos?${qs}` : '/inventario/insumos';
     return apiFetch<InsumoInventarioDto[]>(endpoint);
+  },
+
+  /**
+   * Obtiene el Inventario Maestro paginado (15 registros por página por defecto),
+   * delegando búsqueda, filtros de categoría/estado de stock y ordenamiento al backend .NET.
+   */
+  async getInsumosPaginado(params?: {
+    categoria?: string;
+    busqueda?: string;
+    estadoStock?: EstadoStockFiltro;
+    ordenarPor?: OrdenInventario;
+    pagina?: number;
+    tamanoPagina?: number;
+  }): Promise<InventarioPaginadoDto> {
+    const query = new URLSearchParams();
+    if (params?.categoria && params.categoria !== 'Todas') {
+      query.append('categoria', params.categoria);
+    }
+    if (params?.busqueda?.trim()) {
+      query.append('busqueda', params.busqueda.trim());
+    }
+    if (params?.estadoStock && params.estadoStock !== 'todos') {
+      query.append('estadoStock', params.estadoStock);
+    }
+    if (params?.ordenarPor && params.ordenarPor !== 'categoria_nombre') {
+      query.append('ordenarPor', params.ordenarPor);
+    }
+    if (params?.pagina) {
+      query.append('pagina', String(params.pagina));
+    }
+    if (params?.tamanoPagina) {
+      query.append('tamanoPagina', String(params.tamanoPagina));
+    }
+
+    const qs = query.toString();
+    const endpoint = qs ? `/inventario/insumos/paginado?${qs}` : '/inventario/insumos/paginado';
+    return apiFetch<InventarioPaginadoDto>(endpoint);
   },
 
   /**
