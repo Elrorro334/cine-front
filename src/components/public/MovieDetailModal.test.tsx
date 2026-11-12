@@ -130,4 +130,29 @@ describe('MovieDetailModal Component', () => {
     fireEvent.click(backdropBtn);
     expect(mockOnClose).toHaveBeenCalled();
   });
+
+  test('muestra mensaje cuando no hay tráiler disponible', async () => {
+    const { carteleraService } = jest.requireMock('@/services/carteleraService');
+    carteleraService.obtenerTrailer.mockResolvedValueOnce(null);
+
+    const movieSinTrailer: Movie = { ...mockMovie, trailerKey: null };
+    render(<MovieDetailModal isOpen={true} movie={movieSinTrailer} onClose={mockOnClose} />);
+
+    const trailerBtn = screen.getByRole('button', { name: /Ver Tráiler/i });
+    fireEvent.click(trailerBtn);
+
+    expect(await screen.findByText(/No hay tráiler disponible para esta función/i)).toBeInTheDocument();
+  });
+
+  test('maneja error en servicio de tráiler usando el fallback de movie', async () => {
+    const { carteleraService } = jest.requireMock('@/services/carteleraService');
+    carteleraService.obtenerTrailer.mockRejectedValueOnce(new Error('Network error'));
+
+    render(<MovieDetailModal isOpen={true} movie={mockMovie} onClose={mockOnClose} />);
+
+    const trailerBtn = screen.getByRole('button', { name: /Ver Tráiler/i });
+    fireEvent.click(trailerBtn);
+
+    expect(await screen.findByTitle(/Tráiler de Resident Evil: Noche cero/i)).toBeInTheDocument();
+  });
 });
