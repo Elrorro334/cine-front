@@ -1,0 +1,10 @@
+:root{--xilotzin-primary:#006847;--xilotzin-secondary:#CE1126;--xilotzin-bg:#090D0B;--xilotzin-surface:#111A15;--xilotzin-border:#1E3A2A;--xilotzin-text:#FFFFFF}
+.public-theme-root{background-color:#090D0B!important;color:#FFFFFF!important}
+.public-theme-marquee{background:linear-gradient(90deg,#006847 0%,#f8fafc 50%,#CE1126 100%)!important;color:#0A0A0A!important;border-bottom-color:rgba(0,104,71,.6)!important}
+.public-theme-marquee p{color:#0A0A0A!important;text-shadow:0 1px 0 rgba(255,255,255,.55)}
+.public-theme-hero-glow{background:linear-gradient(90deg,rgba(0,104,71,.34),rgba(255,255,255,.08),rgba(206,17,38,.3))!important}
+.public-theme-divider{background:linear-gradient(90deg,#006847,#FFFFFF,#CE1126)!important;box-shadow:0 8px 22px rgba(0,104,71,.5)!important}
+.public-theme-card{background-color:#111A15!important;border-color:#1E3A2A!important}
+.public-theme-card:hover{border-color:#006847!important;box-shadow:0 20px 40px rgba(0,104,71,.35)!important}
+.public-theme-pill-active{background-color:#006847!important;color:#FFFFFF!important;box-shadow:0 6px 18px rgba(0,104,71,.45)!important}
+.public-theme-footer-bar{background:linear-gradient(90deg,#006847,#FFFFFF,#CE1126)!important}

@@ -134,7 +134,7 @@ export default function PublicPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-['Montserrat',sans-serif] flex flex-col antialiased selection:bg-[#E11D2F] selection:text-white relative">
+    <div className="public-theme-root min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-['Montserrat',sans-serif] flex flex-col antialiased selection:bg-[#E11D2F] selection:text-white relative">
       {/* Fondo de Palomitas y Elementos de Cine en Movimiento */}
       <CinemaAmbientParticles />
 
@@ -148,7 +148,7 @@ export default function PublicPage() {
           style={{ backgroundImage: `url('/CINE.png')` }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#E11D2F]/25 via-transparent to-white/10" />
+        <div className="public-theme-hero-glow absolute inset-0 bg-gradient-to-r from-[#E11D2F]/25 via-transparent to-white/10" />
 
         <div className="relative z-10 text-center px-4 sm:px-6 max-w-4xl mx-auto flex flex-col items-center">
           <span className="bg-[#E11D2F]/30 border border-[#E11D2F]/50 text-white font-sans font-bold text-[9px] sm:text-[10px] md:text-xs uppercase tracking-[0.25em] sm:tracking-[0.3em] px-3 sm:px-4 py-1 sm:py-1.5 rounded-full mb-3 sm:mb-4 shadow-lg flex items-center gap-2">
@@ -181,7 +181,7 @@ export default function PublicPage() {
         <div className="flex flex-col items-center mb-10 relative text-center">
           <h2 className="text-3xl md:text-4xl font-['Playfair_Display',serif] font-black uppercase tracking-widest text-white z-10 relative inline-block">
             En Exhibición
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-16 h-1 bg-[#E11D2F] rounded-full shadow-lg shadow-[#E11D2F]/50" />
+            <div className="public-theme-divider absolute -bottom-4 left-1/2 -translate-x-1/2 w-16 h-1 bg-[#E11D2F] rounded-full shadow-lg shadow-[#E11D2F]/50" />
           </h2>
           <p className="text-[#A0A0A0] text-xs font-sans uppercase tracking-[0.2em] font-semibold mt-6 max-w-md">
             Haz clic en cualquier película para ver sinopsis completa, ficha oficial, horarios y apartar tus accesos en Pre-orden.
@@ -200,7 +200,7 @@ export default function PublicPage() {
                   onClick={() => setSelectedClassification(c)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all shrink-0 ${
                     isSelected
-                      ? 'bg-[#E11D2F] text-white shadow-md'
+                      ? 'public-theme-pill-active bg-[#E11D2F] text-white shadow-md'
                       : 'bg-[#121212] text-[#A0A0A0] border border-[#262626] hover:text-white'
                   }`}
                 >

@@ -9,7 +9,7 @@ interface MovieCardProps {
 
 export default function MovieCard({ movie, onSelect }: MovieCardProps) {
   return (
-    <article className="group relative rounded-2xl overflow-hidden bg-[#121212] border border-[#262626] hover:border-[#E11D2F]/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(225,29,47,0.25)] flex flex-col">
+    <article className="public-theme-card group relative rounded-2xl overflow-hidden bg-[#121212] border border-[#262626] hover:border-[#E11D2F]/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(225,29,47,0.25)] flex flex-col">
       {/* Portada limpia de película (Aspect 2/3 exacto a la maqueta) */}
       <button
         type="button"

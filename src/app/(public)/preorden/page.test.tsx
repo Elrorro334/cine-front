@@ -133,21 +133,30 @@ describe('PreordenPage Component', () => {
     expect(screen.getByText('$160 MXN')).toBeInTheDocument();
   });
 
-  test('valida formato de teléfono (debe iniciar con 55 y tener 10 dígitos)', async () => {
+  test('valida formato de teléfono de México (10 dígitos con cualquier lada y soporte +52)', async () => {
     render(<PreordenPage />);
 
     await screen.findAllByText('La posesión de la momia');
 
     const telInput = screen.getByLabelText(/Teléfono \/ WhatsApp/i);
-    fireEvent.change(telInput, { target: { value: '7221234567' } });
 
-    expect(screen.getByText(/El número de teléfono debe iniciar con 55/i)).toBeInTheDocument();
+    // Número que inicia con 0 o 1 (inválido en México)
+    fireEvent.change(telInput, { target: { value: '0123456789' } });
+    expect(screen.getByText(/la lada no puede iniciar con 0 o 1/i)).toBeInTheDocument();
 
-    fireEvent.change(telInput, { target: { value: '55123' } });
+    // Número incompleto
+    fireEvent.change(telInput, { target: { value: '77312' } });
     expect(screen.getByText(/Faltan dígitos: llevas 5 de 10 dígitos/i)).toBeInTheDocument();
 
-    fireEvent.change(telInput, { target: { value: '5512345678' } });
-    expect(screen.queryByText(/El número de teléfono debe iniciar con 55/i)).toBeNull();
+    // Número válido de Tula de Allende (Lada 773)
+    fireEvent.change(telInput, { target: { value: '7731234567' } });
+    expect(screen.queryByText(/la lada no puede iniciar con 0 o 1/i)).toBeNull();
+    expect(screen.queryByText(/Faltan dígitos/i)).toBeNull();
+
+    // Número con formato internacional +52 pegado
+    fireEvent.change(telInput, { target: { value: '+52 773 123 4567' } });
+    expect((telInput as HTMLInputElement).value).toBe('7731234567');
+    expect(screen.queryByText(/Faltan dígitos/i)).toBeNull();
   });
 
   test('envía preorden y abre el modal con código QR e información completa', async () => {
@@ -197,19 +206,92 @@ describe('PreordenPage Component', () => {
     expect(printSpy).toHaveBeenCalled();
     printSpy.mockRestore();
 
-    // Cambiar a pestaña Mis Tickets
+    // Cambiar a pestaña Mis Tickets: guarda el boleto en caché offline y solicita SMS para consultar historial
     const verTicketsBtn = screen.getByRole('button', { name: /Ver en Mis Tickets/i });
     fireEvent.click(verTicketsBtn);
 
-    // Debe mostrar la pestaña Mis Tickets con el ticket guardado
-    const ticketsGuardados = await screen.findAllByText('PRE-XIL-35677');
-    expect(ticketsGuardados.length).toBeGreaterThan(0);
+    expect(await screen.findByText(/Recupera tus Tickets por Teléfono \(SMS\)/i)).toBeInTheDocument();
+    expect(localStorage.getItem('xilotzin_mis_tickets')).toContain('PRE-XIL-35677');
   });
 
-  test('muestra estado vacío en Mis Tickets si no hay tickets guardados', async () => {
-    mockGet.mockReturnValue('tickets');
-    render(<PreordenPage />);
+  test('en Mis Tickets oculta pruebas previas de otros teléfonos hasta verificar por SMS y reemplaza caché', async () => {
+    localStorage.setItem(
+      'xilotzin_mis_tickets',
+      JSON.stringify([
+        {
+          idPreorden: 10,
+          codigo: 'PRE-XIL-OLD01',
+          cliente: 'Otro Cliente',
+          telefono: '5599999999',
+          pelicula: 'Prueba Anterior',
+          horario: '15:00',
+          idFuncion: 99,
+          boletosGeneral: 1,
+          precioBoleto: 50,
+          asientos: [],
+          combos: [],
+          total: 50,
+          fechaCreacion: '2026-11-01',
+          vigenciaDias: 12,
+          estadoActivo: true,
+        },
+      ])
+    );
 
-    expect(await screen.findByText('Aún no tienes tickets generados')).toBeInTheDocument();
+    mockGet.mockReturnValue('tickets');
+    (carteleraService.solicitarCodigoPreordenes as jest.Mock).mockResolvedValueOnce({
+      enviado: true,
+      telefonoEnmascarado: '******4567',
+      expiraEnMinutos: 10,
+      message: 'Código enviado',
+    });
+    (carteleraService.verificarCodigoPreordenes as jest.Mock).mockResolvedValueOnce([
+      {
+        idPreorden: 77,
+        codigo: 'PRE-XIL-77701',
+        cliente: 'Alberto Cruz',
+        telefono: '7731234567',
+        pelicula: 'La posesión de la momia',
+        horario: '19:00',
+        idFuncion: 102,
+        boletosGeneral: 2,
+        precioBoleto: 50,
+        asientos: [],
+        combos: [],
+        total: 100,
+        fechaCreacion: '2026-11-10',
+        vigenciaDias: 12,
+        estadoActivo: true,
+      },
+    ]);
+
+    const { unmount } = render(<PreordenPage />);
+
+    expect(await screen.findByText(/Recupera tus Tickets por Teléfono \(SMS\)/i)).toBeInTheDocument();
+    expect(screen.queryByText('PRE-XIL-OLD01')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Teléfono registrado/i), { target: { value: '7731234567' } });
+    fireEvent.click(screen.getByRole('button', { name: /Enviar código SMS/i }));
+
+    fireEvent.change(await screen.findByLabelText(/Código de verificación/i), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: /Verificar y Ver Tickets/i }));
+
+    expect(await screen.findByText('PRE-XIL-77701')).toBeInTheDocument();
+    expect(screen.queryByText('PRE-XIL-OLD01')).not.toBeInTheDocument();
+    expect(localStorage.getItem('xilotzin_mis_tickets')).toContain('PRE-XIL-77701');
+    expect(localStorage.getItem('xilotzin_mis_tickets')).not.toContain('PRE-XIL-OLD01');
+    expect(localStorage.getItem('xilotzin_verified_phone')).toBe('7731234567');
+
+    // Simular recarga (F5): mantiene la sesión verificada sin volver a pedir SMS
+    unmount();
+    render(<PreordenPage />);
+    expect(await screen.findByText('PRE-XIL-77701')).toBeInTheDocument();
+    expect(screen.getByText(/Verificado: \+52 \*\*\*\*\*\*4567/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Teléfono registrado/i)).not.toBeInTheDocument();
+
+    // Pulsar Consultar otro número limpia la verificación y pide SMS otra vez
+    fireEvent.click(screen.getByRole('button', { name: /Consultar otro número/i }));
+    expect(await screen.findByLabelText(/Teléfono registrado/i)).toBeInTheDocument();
+    expect(localStorage.getItem('xilotzin_verified_phone')).toBeNull();
   });
 });

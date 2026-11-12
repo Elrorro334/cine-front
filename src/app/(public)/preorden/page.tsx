@@ -1,26 +1,116 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useSyncExternalStore, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import PublicNavbar from '@/components/public/PublicNavbar';
 import PublicFooter from '@/components/public/PublicFooter';
 import CinemaAmbientParticles from '@/components/public/CinemaAmbientParticles';
+import MisTicketsSection from '@/components/public/MisTicketsSection';
 import { carteleraService } from '@/services/carteleraService';
 import { apiFetch } from '@/lib/apiClient';
 import { generarQrDataUrl } from '@/lib/qrcode';
+import { normalizeMexicanPhone, formatTicketValidityDate } from '@/lib/phoneUtils';
 import { Movie } from '@/types/cartelera';
 import { ProductoDto, PreordenDto, CrearPreordenDto } from '@/types/api';
 
 const LOCAL_STORAGE_TICKETS_KEY = 'xilotzin_mis_tickets';
+const LOCAL_STORAGE_VERIFIED_PHONE_KEY = 'xilotzin_verified_phone';
+const TICKETS_SYNC_EVENT = 'xilotzin_tickets_updated';
+const VERIFIED_PHONE_SYNC_EVENT = 'xilotzin_verified_phone_updated';
+const EMPTY_TICKETS: PreordenDto[] = [];
 
-function formatShowtimeDate(dias = 12): string {
-  const d = new Date();
-  d.setDate(d.getDate() + dias);
-  return d.toLocaleDateString('es-MX', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+let cachedTicketsRaw: string | null | undefined;
+let cachedTicketsValue: PreordenDto[] = EMPTY_TICKETS;
+
+function subscribeLocalKey(eventName: string) {
+  return (callback: () => void): () => void => {
+    if (typeof window === 'undefined') {
+      return () => {};
+    }
+    window.addEventListener('storage', callback);
+    window.addEventListener(eventName, callback);
+    return () => {
+      window.removeEventListener('storage', callback);
+      window.removeEventListener(eventName, callback);
+    };
+  };
+}
+
+const subscribeSavedTickets = subscribeLocalKey(TICKETS_SYNC_EVENT);
+const subscribeVerifiedPhone = subscribeLocalKey(VERIFIED_PHONE_SYNC_EVENT);
+
+function readSavedTicketsSnapshot(): PreordenDto[] {
+  if (typeof window === 'undefined') {
+    return EMPTY_TICKETS;
+  }
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
+    if (raw === cachedTicketsRaw) {
+      return cachedTicketsValue;
+    }
+    cachedTicketsRaw = raw;
+    if (!raw) {
+      cachedTicketsValue = EMPTY_TICKETS;
+      return cachedTicketsValue;
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    cachedTicketsValue = Array.isArray(parsed) ? (parsed as PreordenDto[]) : EMPTY_TICKETS;
+    return cachedTicketsValue;
+  } catch {
+    cachedTicketsRaw = null;
+    cachedTicketsValue = EMPTY_TICKETS;
+    return EMPTY_TICKETS;
+  }
+}
+
+function getServerTicketsSnapshot(): PreordenDto[] {
+  return EMPTY_TICKETS;
+}
+
+function readVerifiedPhoneSnapshot(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_VERIFIED_PHONE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const { phone, error } = normalizeMexicanPhone(raw);
+    return error === null && phone.length === 10 ? phone : null;
+  } catch {
+    return null;
+  }
+}
+
+function getServerVerifiedPhoneSnapshot(): string | null {
+  return null;
+}
+
+function writeSavedTickets(tickets: PreordenDto[]) {
+  try {
+    if (tickets.length === 0) {
+      localStorage.removeItem(LOCAL_STORAGE_TICKETS_KEY);
+    } else {
+      localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(tickets));
+    }
+    window.dispatchEvent(new Event(TICKETS_SYNC_EVENT));
+  } catch {
+    // Ignorar errores de storage
+  }
+}
+
+function writeVerifiedPhone(phone: string | null) {
+  try {
+    if (phone) {
+      localStorage.setItem(LOCAL_STORAGE_VERIFIED_PHONE_KEY, phone);
+    } else {
+      localStorage.removeItem(LOCAL_STORAGE_VERIFIED_PHONE_KEY);
+    }
+    window.dispatchEvent(new Event(VERIFIED_PHONE_SYNC_EVENT));
+  } catch {
+    // Ignorar errores de storage
+  }
 }
 
 function PreordenForm() {
@@ -29,9 +119,19 @@ function PreordenForm() {
   const initialHorario = searchParams.get('horario');
   const initialTab = searchParams.get('tab');
 
-  const [activeTab, setActiveTab] = useState<'nueva' | 'mis-tickets'>(
-    initialTab === 'tickets' ? 'mis-tickets' : 'nueva'
-  );
+  const [manualTab, setManualTab] = useState<{
+    tabParam: string | null;
+    value: 'nueva' | 'mis-tickets';
+  } | null>(null);
+
+  const urlDefaultTab: 'nueva' | 'mis-tickets' =
+    initialTab === 'tickets' ? 'mis-tickets' : 'nueva';
+  const activeTab: 'nueva' | 'mis-tickets' =
+    manualTab && manualTab.tabParam === initialTab ? manualTab.value : urlDefaultTab;
+
+  const setActiveTab = (tab: 'nueva' | 'mis-tickets') => {
+    setManualTab({ tabParam: initialTab, value: tab });
+  };
 
   // Catálogo de películas y dulcería
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -51,28 +151,22 @@ function PreordenForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Tickets guardados en local
-  const [savedTickets, setSavedTickets] = useState<PreordenDto[]>([]);
+  // Tickets guardados y teléfono verificado en este dispositivo (sincronizados sin efecto bloqueante)
+  const savedTickets = useSyncExternalStore(
+    subscribeSavedTickets,
+    readSavedTicketsSnapshot,
+    getServerTicketsSnapshot
+  );
+  const verifiedPhone = useSyncExternalStore(
+    subscribeVerifiedPhone,
+    readVerifiedPhoneSnapshot,
+    getServerVerifiedPhoneSnapshot
+  );
 
   // Ticket activo en modal de confirmación
   const [activeTicket, setActiveTicket] = useState<PreordenDto | null>(null);
   const [activeTicketQrUrl, setActiveTicketQrUrl] = useState<string>('');
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
-
-  // Cargar tickets guardados en localStorage
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LOCAL_STORAGE_TICKETS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as PreordenDto[];
-        if (Array.isArray(parsed)) {
-          setSavedTickets(parsed);
-        }
-      }
-    } catch {
-      // Ignorar errores de parseo en cliente
-    }
-  }, []);
 
   // Cargar cartelera y dulcería de la base de datos
   useEffect(() => {
@@ -180,31 +274,38 @@ function PreordenForm() {
     });
   };
 
-  // Validación reactiva de teléfono: 10 dígitos iniciando con 55
+  // Normalización y validación reactiva de teléfono de México (10 dígitos nacionales)
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '').slice(0, 10);
-    setTelefonoCliente(raw);
-
-    if (raw.length === 0) {
-      setPhoneError('El teléfono es obligatorio.');
-    } else if (!raw.startsWith('55')) {
-      setPhoneError('El número de teléfono debe iniciar con 55 (ej. 5512345678).');
-    } else if (raw.length < 10) {
-      setPhoneError(`Faltan dígitos: llevas ${raw.length} de 10 dígitos.`);
-    } else {
-      setPhoneError(null);
-    }
+    const { phone, error } = normalizeMexicanPhone(e.target.value);
+    setTelefonoCliente(phone);
+    setPhoneError(error);
   };
 
-  // Guardar ticket en localStorage
+  // Guardar ticket recién generado para el mismo teléfono en localStorage (caché offline HU-03)
   const saveTicketToLocal = (ticket: PreordenDto) => {
-    try {
-      const updated = [ticket, ...savedTickets.filter((t) => t.codigo !== ticket.codigo)];
-      setSavedTickets(updated);
-      localStorage.setItem(LOCAL_STORAGE_TICKETS_KEY, JSON.stringify(updated));
-    } catch {
-      // Ignorar errores de storage
+    const current = readSavedTicketsSnapshot();
+    const ticketPhone = normalizeMexicanPhone(ticket.telefono || '').phone;
+    if (verifiedPhone && ticketPhone && verifiedPhone !== ticketPhone) {
+      writeVerifiedPhone(null);
     }
+    const samePhoneTickets = ticketPhone
+      ? current.filter(
+          (t) =>
+            t.codigo !== ticket.codigo &&
+            normalizeMexicanPhone(t.telefono || '').phone === ticketPhone
+        )
+      : current.filter((t) => t.codigo !== ticket.codigo);
+    writeSavedTickets([ticket, ...samePhoneTickets]);
+  };
+
+  // Reemplazar caché local y recordar dispositivo verificado para ese teléfono
+  const handleTicketsRecovered = (phone: string, recoveredTickets: PreordenDto[]) => {
+    writeSavedTickets(recoveredTickets);
+    writeVerifiedPhone(phone);
+  };
+
+  const handleChangeVerifiedPhone = () => {
+    writeVerifiedPhone(null);
   };
 
   // Abrir modal de ticket y generar QR
@@ -230,8 +331,8 @@ function PreordenForm() {
       return;
     }
 
-    if (telefonoCliente.length !== 10 || !telefonoCliente.startsWith('55')) {
-      setPhoneError('El teléfono debe contener exactamente 10 dígitos e iniciar con 55 (ej. 5512345678).');
+    if (telefonoCliente.length !== 10 || telefonoCliente.startsWith('0') || telefonoCliente.startsWith('1')) {
+      setPhoneError('El teléfono debe contener 10 dígitos válidos de México (ej. Tula 7731234567 o CDMX 5512345678).');
       setFormError('Por favor verifica tu número de teléfono.');
       return;
     }
@@ -278,7 +379,7 @@ function PreordenForm() {
   };
 
   return (
-    <div className={`min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-['Montserrat',sans-serif] flex flex-col antialiased selection:bg-[#E11D2F] selection:text-white relative ${isTicketModalOpen ? 'modal-ticket-active' : ''}`}>
+    <div className={`public-theme-root min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-['Montserrat',sans-serif] flex flex-col antialiased selection:bg-[#E11D2F] selection:text-white relative ${isTicketModalOpen ? 'modal-ticket-active' : ''}`}>
       <div className="no-print">
         <CinemaAmbientParticles />
       </div>
@@ -322,7 +423,8 @@ function PreordenForm() {
                   : 'text-[#A0A0A0] hover:text-white'
               }`}
             >
-              <i className="fa-solid fa-ticket mr-1.5" /> Mis Tickets ({savedTickets.length})
+              <i className="fa-solid fa-ticket mr-1.5" />{' '}
+              {verifiedPhone ? `Mis Tickets (${savedTickets.length})` : 'Mis Tickets'}
             </button>
           </div>
         </div>
@@ -592,7 +694,7 @@ function PreordenForm() {
                   )}
                 </div>
 
-                {/* Apartado 5: Datos de Quien Recoge (Validación de teléfono 55) */}
+                {/* Apartado 5: Datos de Quien Recoge (Validación de teléfono México 10 dígitos) */}
                 <div className="bg-[#121212] border border-[#262626] rounded-2xl p-6 shadow-xl">
                   <div className="flex items-center gap-3 mb-4">
                     <span className="w-7 h-7 rounded-full bg-[#E11D2F] text-white font-bold text-xs flex items-center justify-center">
@@ -621,27 +723,33 @@ function PreordenForm() {
 
                     <div>
                       <label htmlFor="input-cliente-telefono" className="block text-xs font-bold uppercase text-[#A0A0A0] mb-1.5">
-                        Teléfono / WhatsApp (10 dígitos - Inicia con 55) *
+                        Teléfono / WhatsApp (10 dígitos - México) *
                       </label>
-                      <input
-                        id="input-cliente-telefono"
-                        type="tel"
-                        value={telefonoCliente}
-                        onChange={handlePhoneChange}
-                        placeholder="5512345678"
-                        maxLength={10}
-                        required
-                        className={`w-full bg-[#0A0A0A] border rounded-xl px-4 py-3 text-xs text-white focus:outline-none transition-colors font-mono ${
-                          phoneError ? 'border-red-500' : 'border-[#262626] focus:border-[#E11D2F]'
-                        }`}
-                      />
+                      <div className="relative flex items-center">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-3 bg-[#171717] border border-r-0 border-[#262626] rounded-l-xl text-xs font-semibold text-[#D4D4D4] select-none">
+                          <i className="fa-solid fa-phone text-[#E11D2F] text-[10px]" aria-hidden="true" />
+                          <span className="font-mono text-white text-xs">+52</span>
+                        </span>
+                        <input
+                          id="input-cliente-telefono"
+                          type="tel"
+                          value={telefonoCliente}
+                          onChange={handlePhoneChange}
+                          placeholder="Ej. 7731234567"
+                          maxLength={15}
+                          required
+                          className={`w-full bg-[#0A0A0A] border rounded-r-xl px-4 py-3 text-xs text-white focus:outline-none transition-colors font-mono ${
+                            phoneError ? 'border-red-500' : 'border-[#262626] focus:border-[#E11D2F]'
+                          }`}
+                        />
+                      </div>
                       {phoneError ? (
                         <p className="text-[11px] text-red-400 mt-1 flex items-center gap-1">
                           <i className="fa-solid fa-triangle-exclamation" /> {phoneError}
                         </p>
                       ) : (
                         <p className="text-[10px] text-[#A0A0A0] mt-1">
-                          Formato requerido: 10 dígitos iniciando con 55.
+                          Formato: 10 dígitos de cualquier lada de México (ej. Tula 773, CDMX 55, Jilotepec 761).
                         </p>
                       )}
                     </div>
@@ -762,71 +870,18 @@ function PreordenForm() {
           </form>
         ) : (
           /* ==========================================================
-               PESTAÑA 2: MIS TICKETS DIGITALES ACTIVOS
+               PESTAÑA 2: MIS TICKETS DIGITALES ACTIVOS + RECUPERACIÓN SMS (HU-03)
                ========================================================== */
-          <div className="space-y-6 max-w-4xl mx-auto">
-            {savedTickets.length === 0 ? (
-              <div className="bg-[#121212] border border-[#262626] rounded-3xl p-12 text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-[#1c1c1c] mx-auto flex items-center justify-center text-[#A0A0A0] text-2xl">
-                  <i className="fa-solid fa-ticket" />
-                </div>
-                <h2 className="text-lg font-bold text-white uppercase">Aún no tienes tickets generados</h2>
-                <p className="text-xs text-[#A0A0A0] max-w-sm mx-auto">
-                  Genera tu primera pre-orden digital para reservar tus boletos sin costo previo y canjearlos en taquilla física.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('nueva')}
-                  className="mt-2 bg-[#E11D2F] hover:bg-[#c81928] text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors inline-flex items-center gap-2"
-                >
-                  <i className="fa-solid fa-plus" /> Generar Pre-orden
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {savedTickets.map((t) => (
-                  <div
-                    key={t.codigo}
-                    className="bg-[#121212] border border-[#262626] rounded-2xl p-5 shadow-xl space-y-4 flex flex-col justify-between"
-                  >
-                    <div className="flex items-start justify-between border-b border-[#262626] pb-3">
-                      <div>
-                        <span className="text-[10px] font-mono font-bold text-[#E11D2F] uppercase tracking-widest block">
-                          {t.codigo}
-                        </span>
-                        <h3 className="text-base font-['Playfair_Display',serif] font-black uppercase text-white mt-0.5">
-                          {t.pelicula}
-                        </h3>
-                        <p className="text-[11px] text-[#A0A0A0] font-sans">
-                          Función: {t.horario} • {t.boletosGeneral} boletos
-                        </p>
-                      </div>
-                      <span className="text-[10px] bg-emerald-950/60 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded font-bold uppercase tracking-widest">
-                        Vigente
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs pt-1">
-                      <span className="text-[#A0A0A0]">Total en Taquilla:</span>
-                      <span className="font-mono font-black text-sm text-[#DCA54C]">
-                        ${t.total} MXN
-                      </span>
-                    </div>
-
-                    <div className="pt-2 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => abrirModalTicket(t)}
-                        className="flex-1 bg-[#E11D2F] hover:bg-[#c81928] text-white py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors"
-                      >
-                        <i className="fa-solid fa-qrcode" /> Ver Código QR
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <MisTicketsSection
+            tickets={savedTickets}
+            verifiedPhone={verifiedPhone}
+            onOpenQr={(ticket) => {
+              void abrirModalTicket(ticket);
+            }}
+            onGoToNewPreorder={() => setActiveTab('nueva')}
+            onTicketsRecovered={handleTicketsRecovered}
+            onChangeVerifiedPhone={handleChangeVerifiedPhone}
+          />
         )}
       </main>
 
@@ -902,7 +957,9 @@ function PreordenForm() {
             <div className="bg-[#0A0A0A] border border-[#262626] rounded-xl p-3 mb-3 text-xs font-mono space-y-1 text-left ticket-info-box">
               <div className="flex justify-between items-center text-[#A0A0A0] print:text-neutral-800">
                 <span>Válido hasta:</span>
-                <span className="text-white print:text-black font-bold">{formatShowtimeDate(12)}</span>
+                <span className="text-white print:text-black font-bold">
+                  {formatTicketValidityDate(activeTicket.fechaCreacion, activeTicket.vigenciaDias || 12)}
+                </span>
               </div>
               <div className="flex justify-between items-center text-[#A0A0A0] print:text-neutral-800">
                 <span>Total en Taquilla:</span>
@@ -911,7 +968,7 @@ function PreordenForm() {
               <div className="flex justify-between items-center text-[#A0A0A0] print:text-neutral-800">
                 <span>Estado:</span>
                 <span className="text-emerald-400 print:text-emerald-800 font-bold bg-emerald-950/60 print:bg-emerald-50 px-2 py-0.5 rounded text-[10px] print:border print:border-emerald-600">
-                  VIGENTE ({activeTicket.vigenciaDias || 12} DÍAS)
+                  {activeTicket.estadoActivo === false ? 'CANJEADO' : `VIGENTE (${activeTicket.vigenciaDias || 12} DÍAS)`}
                 </span>
               </div>
             </div>

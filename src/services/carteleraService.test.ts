@@ -250,4 +250,41 @@ describe('carteleraService', () => {
       expect.any(Object)
     );
   });
+
+  test('solicitarCodigoPreordenes envía POST al endpoint SMS de recuperación', async () => {
+    const mockResp = {
+      enviado: true,
+      telefonoEnmascarado: '******4567',
+      expiraEnMinutos: 10,
+      message: 'Enviado',
+    };
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResp,
+    });
+
+    const res = await carteleraService.solicitarCodigoPreordenes('7731234567');
+    expect(res.enviado).toBe(true);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/cartelera/preordenes/solicitar-codigo'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  test('verificarCodigoPreordenes envía POST y retorna pre-órdenes desde SQL Server', async () => {
+    const mockList = [{ idPreorden: 1, codigo: 'PRE-XIL-88001' }];
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockList,
+    });
+
+    const res = await carteleraService.verificarCodigoPreordenes('7731234567', '123456');
+    expect(res).toHaveLength(1);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/cartelera/preordenes/verificar-codigo'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
 });

@@ -74,4 +74,20 @@ export const taquillaService = {
   async getPreorden(codigoQr: string): Promise<PreordenDto> {
     return apiFetch<PreordenDto>(`/taquilla/preorden/${encodeURIComponent(codigoQr)}`);
   },
+
+  /**
+   * HU-08: Obtiene el listado de pre-órdenes activas y vigentes (<= 12 días) para selector rápido en caja
+   */
+  async getPreordenesActivas(): Promise<PreordenDto[]> {
+    return apiFetch<PreordenDto[]>('/taquilla/preordenes-activas');
+  },
+
+  /**
+   * HU-08: Valida un código QR de pre-orden en caja verificando vigencia de 12 días y que no esté canjeada
+   */
+  async validarPreordenQr(codigoQr: string): Promise<PreordenDto> {
+    return apiFetch<PreordenDto>(`/taquilla/preorden/validar/${encodeURIComponent(codigoQr)}`, {
+      method: 'POST',
+    });
+  },
 };
