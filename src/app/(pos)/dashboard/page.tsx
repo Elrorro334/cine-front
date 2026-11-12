@@ -6,25 +6,29 @@ import { authService } from '@/services/authService';
 import FinancialDashboardView from '@/components/pos/FinancialDashboardView';
 import CarteleraAdminView from '@/components/pos/CarteleraAdminView';
 import InventarioAdminView from '@/components/pos/InventarioAdminView';
+import SeguridadTematicasAdminView from '@/components/pos/SeguridadTematicasAdminView';
 
-type TabType = 'finanzas' | 'cartelera' | 'inventario';
+type TabType = 'finanzas' | 'cartelera' | 'inventario' | 'seguridad';
 
 function getHeaderTitle(tab: TabType): string {
   if (tab === 'finanzas') return 'Módulo Administrativo • Dashboard Financiero';
   if (tab === 'cartelera') return 'Módulo de Cartelera • Sincronización TMDB';
-  return 'Módulo Administrativo • Inventario Maestro y Entradas';
+  if (tab === 'inventario') return 'Módulo Administrativo • Inventario Maestro y Entradas';
+  return 'Módulo Administrativo • Seguridad IP y Temáticas Estacionales';
 }
 
 function getHeaderTag(tab: TabType): string {
   if (tab === 'finanzas') return 'Finanzas';
   if (tab === 'cartelera') return 'Catálogo';
-  return 'HU-11';
+  if (tab === 'inventario') return 'Inventario';
+  return 'Seguridad & Temáticas';
 }
 
 function renderTabContent(tab: TabType) {
   if (tab === 'finanzas') return <FinancialDashboardView />;
   if (tab === 'cartelera') return <CarteleraAdminView />;
-  return <InventarioAdminView />;
+  if (tab === 'inventario') return <InventarioAdminView />;
+  return <SeguridadTematicasAdminView />;
 }
 
 export default function DashboardPage() {
@@ -39,7 +43,7 @@ export default function DashboardPage() {
     return 'Administrador';
   });
 
-  // 1. Verificación de sesión y restricción estricta de Administrador 
+  // 1. Verificación de sesión y restricción estricta de Administrador
   useEffect(() => {
     const session = authService.getUserSession();
     if (!session) {
@@ -79,6 +83,7 @@ export default function DashboardPage() {
         {/* Header del Sidebar */}
         <div className="h-20 border-b border-[#262626] flex items-center justify-between px-6">
           <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTmU78ReuLCf8T4T3Rv6K8-yAB13kXuZX7_TQ&s"
               alt="Xilotzin Emblem"
@@ -153,6 +158,23 @@ export default function DashboardPage() {
           >
             <i className="fa-solid fa-boxes-stacked text-sm" />
             <span>Inventario & Entradas</span>
+          </button>
+
+          {/* Módulo de Seguridad IP y Temáticas Estacionales (HU-12) */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('seguridad');
+              setIsSidebarOpen(false);
+            }}
+            className={`w-full text-left px-4 py-3 rounded-xl font-sans font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all ${
+              activeTab === 'seguridad'
+                ? 'text-white bg-[#D81B60] shadow-[0_0_15px_rgba(216,27,96,0.3)]'
+                : 'text-[#a3a3a3] hover:text-white hover:bg-[#1a1a1a]'
+            }`}
+          >
+            <i className="fa-solid fa-shield-halved text-sm" />
+            <span>Seguridad & Temáticas</span>
           </button>
 
           <div className="pt-4 mt-2 border-t border-[#262626]">

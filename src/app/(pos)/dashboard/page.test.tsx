@@ -37,6 +37,17 @@ jest.mock('@/services/dashboardService', () => ({
   },
 }));
 
+jest.mock('@/services/configuracionService', () => ({
+  THEME_BROADCAST_CHANNEL: 'xilotzin_theme_channel',
+  THEME_CUSTOM_EVENT: 'xilotzin-theme-updated',
+  configuracionService: {
+    getConfiguracionSeguridad: jest.fn(),
+    actualizarConfiguracionSeguridad: jest.fn(),
+    getTematicas: jest.fn(),
+    activarTematica: jest.fn(),
+  },
+}));
+
 describe('DashboardPage Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -215,5 +226,34 @@ describe('DashboardPage Component', () => {
 
     expect(authService.logout).toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith('/login');
+  });
+
+  test('permite navegar al módulo de Seguridad & Temáticas', async () => {
+    const { configuracionService } = jest.requireMock('@/services/configuracionService');
+    (configuracionService.getConfiguracionSeguridad as jest.Mock).mockResolvedValue({
+      id: 1,
+      sucursalId: 1,
+      sucursalNombre: 'Matriz',
+      ipDefecto: '192.168.1.100',
+      ipAutorizada: '192.168.1.100',
+      horarioInicioCajeros: '08:00:00',
+      horarioFinCajeros: '23:00:00',
+      autorizarExcepcionHorasExtras: false,
+      fechaUltimaModificacion: '2026-11-11T12:00:00',
+      usuarioModificoId: 1,
+      ipClienteDetectada: '192.168.1.10',
+      mismaSubredQueCliente: true,
+      turnosLaborales: [],
+    });
+    (configuracionService.getTematicas as jest.Mock).mockResolvedValue([]);
+
+    render(<DashboardPage />);
+
+    const tabSeguridad = screen.getByRole('button', { name: /Seguridad & Temáticas/i });
+    fireEvent.click(tabSeguridad);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Control de Accesos y Seguridad IP/i)).toBeInTheDocument();
+    });
   });
 });

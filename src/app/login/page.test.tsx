@@ -101,4 +101,25 @@ describe('LoginPage Component', () => {
       expect(screen.getByText('Acceso Denegado')).toBeInTheDocument();
     });
   });
+
+  test('muestra título específico cuando el cajero intenta acceder fuera de horario laboral', async () => {
+    (authService.login as jest.Mock).mockResolvedValueOnce({
+      success: false,
+      message: 'Acceso fuera de horario laboral autorizado',
+    });
+
+    render(<LoginPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('192.168.1.105')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(/Usuario \/ Perfil/i), { target: { value: 'cajero1' } });
+    fireEvent.change(screen.getByLabelText(/Contraseña/i), { target: { value: 'pass123' } });
+    fireEvent.click(screen.getByRole('button', { name: /Validar e Ingresar/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Acceso Fuera de Horario Laboral')).toBeInTheDocument();
+    });
+  });
 });

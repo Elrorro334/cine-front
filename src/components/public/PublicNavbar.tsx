@@ -9,7 +9,7 @@ export default function PublicNavbar() {
   return (
     <header className="sticky top-0 z-50 bg-[#0d0d0d]/95 backdrop-blur-md border-b border-[#262626]">
       {/* Barra Superior Marquee Estacional */}
-      <div className="bg-gradient-to-r from-[#E11D2F] via-red-700 to-[#E11D2F] text-white py-1.5 px-4 border-b border-[#E11D2F]/50 shadow-md text-xs font-sans">
+      <div className="public-theme-marquee bg-gradient-to-r from-[#E11D2F] via-red-700 to-[#E11D2F] text-white py-1.5 px-4 border-b border-[#E11D2F]/50 shadow-md text-xs font-sans">
         <div className="max-w-7xl mx-auto overflow-hidden whitespace-nowrap">
           <p className="text-[11px] sm:text-xs font-bold tracking-wider truncate text-center">
             <i className="fa-solid fa-film mr-2" /> CINE XILOTZIN • LA TRADICIÓN CINEMATOGRÁFICA DE JILOTEPEC DESDE 1998 • BOLETOS GENERALES $50 • CARTELERA EN VIVO <i className="fa-solid fa-ticket ml-2" />

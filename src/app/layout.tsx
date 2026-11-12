@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import ThemeStylesheetLoader from "@/components/public/ThemeStylesheetLoader";
 
 export const viewport: Viewport = {
   themeColor: "#000000",
@@ -26,8 +27,17 @@ export default function RootLayout({
           crossOrigin="anonymous"
           referrerPolicy="no-referrer"
         />
+        {/* eslint-disable-next-line @next/next/no-css-tags */}
+        <link
+          id="theme-stylesheet"
+          rel="stylesheet"
+          href="/css/themes/classic.min.css"
+        />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <ThemeStylesheetLoader />
+        {children}
+      </body>
     </html>
   );
 }

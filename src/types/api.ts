@@ -162,6 +162,8 @@ export interface OrdenLineaCalculadaDto {
   precioUnitario: number;
   subtotal: number;
   asientos?: string[];
+  esPreorden?: boolean;
+  codigoPreorden?: string | null;
 }
 
 export interface ResumenOrdenCalculadoDto {
@@ -184,11 +186,17 @@ export interface RegistrarVentaItemDto {
   cantidad: number;
   precio: number;
   asientos?: string[];
+  esPreorden?: boolean;
+  codigoPreorden?: string | null;
+  nombreSala?: string | null;
 }
 
 export interface RegistrarVentaDto {
   idVendedor: number;
   metodoPago: string;
+  montoRecibido?: number | null;
+  folioAutorizacion?: string | null;
+  codigoPreorden?: string | null;
   items: RegistrarVentaItemDto[];
 }
 
@@ -197,11 +205,19 @@ export interface VentaConfirmadaDto {
   folio: string;
   total: number;
   metodoPago: string;
+  montoRecibido: number;
+  cambio: number;
+  folioAutorizacion?: string | null;
+  rfcCine: string;
+  codigoBarrasTicket: string;
+  codigoPreordenCanjeada?: string | null;
   fechaVenta: string;
   items: RegistrarVentaItemDto[];
 }
 
 export interface PreordenComboDto {
+  idProducto?: number | null;
+  sku?: string;
   nombre: string;
   cantidad: number;
   precio: number;
@@ -222,6 +238,10 @@ export interface PreordenDto {
   total: number;
   fechaCreacion: string;
   vigenciaDias: number;
+  diasTranscurridos?: number;
+  expirada?: boolean;
+  canjeada?: boolean;
+  motivoRechazo?: string | null;
   estadoActivo: boolean;
 }
 
@@ -237,6 +257,22 @@ export interface CrearPreordenDto {
   nombreCliente: string;
   telefonoCliente: string;
   combos?: CrearPreordenItemDulceriaDto[];
+}
+
+export interface SolicitarCodigoPreordenDto {
+  telefono: string;
+}
+
+export interface SolicitarCodigoPreordenResponseDto {
+  enviado: boolean;
+  telefonoEnmascarado: string;
+  expiraEnMinutos: number;
+  message: string;
+}
+
+export interface VerificarCodigoPreordenDto {
+  telefono: string;
+  codigo: string;
 }
 
 export interface PeriodoDashboardDto {

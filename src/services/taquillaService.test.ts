@@ -190,4 +190,39 @@ describe('taquillaService', () => {
     const res = await taquillaService.getPreorden('XILO-2026');
     expect(res.codigo).toBe('XILO-2026');
   });
+
+  test('getPreordenesActivas y validarPreordenQr consultan los endpoints de HU-08', async () => {
+    const mockPreorden = {
+      idPreorden: 1,
+      codigo: 'PRE-XIL-84920',
+      cliente: 'Carlos Ruiz',
+      idFuncion: 10,
+      pelicula: 'Terrifier 3',
+      horario: '12:30',
+      boletosGeneral: 1,
+      precioBoleto: 50,
+      asientos: [],
+      combos: [],
+      total: 115,
+      vigenciaDias: 12,
+      estadoActivo: true,
+    };
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => [mockPreorden],
+    });
+
+    const activas = await taquillaService.getPreordenesActivas();
+    expect(activas).toHaveLength(1);
+    expect(activas[0].codigo).toBe('PRE-XIL-84920');
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockPreorden,
+    });
+
+    const validada = await taquillaService.validarPreordenQr('PRE-XIL-84920');
+    expect(validada.codigo).toBe('PRE-XIL-84920');
+  });
 });
