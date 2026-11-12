@@ -1,0 +1,8 @@
+:root{--xilotzin-primary:#E11D2F;--xilotzin-secondary:#DCA54C;--xilotzin-bg:#0A0A0A;--xilotzin-surface:#121212;--xilotzin-border:#262626;--xilotzin-text:#F5F5F5}
+.public-theme-root{background-color:var(--xilotzin-bg);color:var(--xilotzin-text)}
+.public-theme-marquee{background:linear-gradient(90deg,#E11D2F,#b91c1c,#E11D2F)!important;border-bottom-color:rgba(225,29,47,.5)!important}
+.public-theme-hero-glow{background:linear-gradient(90deg,rgba(225,29,47,.25),transparent,rgba(220,165,76,.12))!important}
+.public-theme-divider{background-color:#E11D2F!important;box-shadow:0 8px 20px rgba(225,29,47,.5)!important}
+.public-theme-card{background-color:#121212!important;border-color:#262626!important}
+.public-theme-card:hover{border-color:rgba(225,29,47,.55)!important;box-shadow:0 20px 40px rgba(225,29,47,.25)!important}
+.public-theme-footer-bar{background:linear-gradient(90deg,#ffffff,#E11D2F,#ffffff)!important}
