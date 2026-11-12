@@ -57,4 +57,77 @@ describe('DulceriaSection Component', () => {
     expect(screen.queryByText('Agua Ciel 600ml')).not.toBeInTheDocument();
     expect(screen.getByText('Palomitas Mantequilla')).toBeInTheDocument();
   });
+
+  test('permite navegar con botones de página siguiente, anterior, primera y última', () => {
+    // Mock scrollIntoView
+    const scrollMock = jest.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollMock;
+
+    render(<DulceriaSection products={mockProducts} loading={false} />);
+
+    // Página 1: Anterior y Primera deshabilitados
+    const prevBtn = screen.getByRole('button', { name: /página anterior/i });
+    const firstBtn = screen.getByRole('button', { name: /primera página/i });
+    const nextBtn = screen.getByRole('button', { name: /página siguiente/i });
+    const lastBtn = screen.getByRole('button', { name: /última página/i });
+
+    expect(prevBtn).toBeDisabled();
+    expect(firstBtn).toBeDisabled();
+    expect(nextBtn).not.toBeDisabled();
+    expect(lastBtn).not.toBeDisabled();
+
+    // Navegar a la página siguiente con Siguiente
+    fireEvent.click(nextBtn);
+    expect(screen.getByText('Combo Pareja')).toBeInTheDocument();
+    expect(nextBtn).toBeDisabled();
+    expect(lastBtn).toBeDisabled();
+    expect(prevBtn).not.toBeDisabled();
+    expect(firstBtn).not.toBeDisabled();
+
+    // Regresar con Anterior
+    fireEvent.click(prevBtn);
+    expect(screen.getByText('Palomitas Mantequilla')).toBeInTheDocument();
+    expect(prevBtn).toBeDisabled();
+
+    // Ir a la última con Última página
+    fireEvent.click(lastBtn);
+    expect(screen.getByText('Combo Familiar')).toBeInTheDocument();
+    expect(lastBtn).toBeDisabled();
+
+    // Regresar a la primera con Primera página
+    fireEvent.click(firstBtn);
+    expect(screen.getByText('Palomitas Mantequilla')).toBeInTheDocument();
+  });
+
+  test('genera elipsis en paginación cuando hay más de 7 páginas', () => {
+    // 80 productos = 10 páginas de 8 items
+    const manyProducts: ProductoDto[] = Array.from({ length: 80 }, (_, i) => ({
+      idProducto: i + 1,
+      sku: `SKU-${i + 1}`,
+      nombre: `Producto Dulcería ${i + 1}`,
+      categoria: 'Snacks',
+      precio: 50,
+      stock: 10,
+    }));
+
+    render(<DulceriaSection products={manyProducts} loading={false} />);
+
+    expect(screen.getByText(/Mostrando 1 - 8 de 80 productos/i)).toBeInTheDocument();
+    expect(screen.getByText(/\(Página 1 de 10\)/i)).toBeInTheDocument();
+
+    // En página 1 con 10 páginas debe haber elipsis a la derecha
+    expect(screen.getByText('...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '10' })).toBeInTheDocument();
+
+    // Navegar a página 5 (en medio)
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+
+    expect(screen.getByText(/\(Página 5 de 10\)/i)).toBeInTheDocument();
+    // En página 5 debe haber ambas elipsis (izquierda y derecha)
+    const ellipses = screen.getAllByText('...');
+    expect(ellipses.length).toBe(2);
+  });
 });

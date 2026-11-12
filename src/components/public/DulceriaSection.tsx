@@ -11,6 +11,39 @@ interface DulceriaSectionProps {
 
 const ITEMS_PER_PAGE = 8;
 type StockFilter = 'todos' | 'disponibles' | 'agotados';
+type PageToken = number | 'ellipsis-left' | 'ellipsis-right';
+
+function buildPaginationTokens(currentPage: number, totalPages: number): PageToken[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, idx) => idx + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, 'ellipsis-right', totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      'ellipsis-left',
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+
+  return [
+    1,
+    'ellipsis-left',
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    'ellipsis-right',
+    totalPages,
+  ];
+}
 
 export default function DulceriaSection({ products, loading }: DulceriaSectionProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
@@ -88,7 +121,24 @@ export default function DulceriaSection({ products, loading }: DulceriaSectionPr
     setCurrentPage(1);
   };
 
-  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE + 1;
+  const handlePageChange = (targetPage: number) => {
+    const clamped = Math.max(1, Math.min(targetPage, totalPages));
+    if (clamped === safeCurrentPage) return;
+    setCurrentPage(clamped);
+    if (typeof window !== 'undefined') {
+      const el = document.getElementById('dulceria');
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
+
+  const paginationTokens = useMemo(
+    () => buildPaginationTokens(safeCurrentPage, totalPages),
+    [safeCurrentPage, totalPages]
+  );
+
+  const startIndex = filteredProducts.length === 0 ? 0 : (safeCurrentPage - 1) * ITEMS_PER_PAGE + 1;
   const endIndex = Math.min(safeCurrentPage * ITEMS_PER_PAGE, filteredProducts.length);
 
   return (
@@ -323,53 +373,108 @@ export default function DulceriaSection({ products, loading }: DulceriaSectionPr
             })}
           </div>
 
-          {/* Barra de Paginación */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[#262626]">
-            <span className="text-xs text-[#A0A0A0] font-mono">
-              Mostrando {startIndex} - {endIndex} de {filteredProducts.length} productos
-              {totalPages > 1 && ` (Página ${safeCurrentPage} de ${totalPages})`}
-            </span>
+          {/* Barra de Paginación Moderna y Responsiva */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-6 border-t border-[#262626]">
+            {/* Resumen de Resultados */}
+            <div className="text-xs text-[#A0A0A0] font-mono flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#E11D2F] shrink-0" aria-hidden="true" />
+              <span>
+                Mostrando {startIndex} - {endIndex} de {filteredProducts.length} productos
+                {totalPages > 1 && (
+                  <span className="text-[#737373] ml-1">
+                    (Página {safeCurrentPage} de {totalPages})
+                  </span>
+                )}
+              </span>
+            </div>
 
+            {/* Controles de Navegación */}
             {totalPages > 1 && (
-              <div className="flex items-center gap-1.5">
+              <nav
+                aria-label="Paginación de dulcería"
+                className="flex items-center flex-wrap justify-center gap-1 sm:gap-1.5 max-w-full"
+              >
+                {/* Ir a Primera Página */}
                 <button
                   type="button"
+                  aria-label="Primera página"
                   disabled={safeCurrentPage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase bg-[#121212] border border-[#262626] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                  onClick={() => handlePageChange(1)}
+                  className="w-8 h-8 rounded-lg text-xs font-mono font-bold bg-[#121212] border border-[#262626] text-[#A0A0A0] hover:text-white hover:bg-[#1f1f1f] hover:border-[#DCA54C]/50 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center shrink-0"
                 >
-                  <i className="fa-solid fa-chevron-left text-[10px]" aria-hidden="true" /> Anterior
+                  <i className="fa-solid fa-angles-left text-[10px]" aria-hidden="true" />
                 </button>
 
+                {/* Página Anterior */}
+                <button
+                  type="button"
+                  aria-label="Página anterior"
+                  disabled={safeCurrentPage <= 1}
+                  onClick={() => handlePageChange(safeCurrentPage - 1)}
+                  className="h-8 px-2.5 sm:px-3 rounded-lg text-xs font-mono font-bold uppercase bg-[#121212] border border-[#262626] text-[#A0A0A0] hover:text-white hover:bg-[#1f1f1f] hover:border-[#DCA54C]/50 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shrink-0"
+                >
+                  <i className="fa-solid fa-chevron-left text-[10px]" aria-hidden="true" />
+                  <span className="hidden sm:inline">Anterior</span>
+                </button>
+
+                {/* Números de Página / Tokens */}
                 <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => {
-                    const isCurrent = pageNum === safeCurrentPage;
+                  {paginationTokens.map((token) => {
+                    if (token === 'ellipsis-left' || token === 'ellipsis-right') {
+                      return (
+                        <span
+                          key={token}
+                          className="w-7 sm:w-8 h-8 flex items-center justify-center text-xs font-mono text-[#737373] select-none shrink-0"
+                          aria-hidden="true"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+
+                    const isCurrent = token === safeCurrentPage;
                     return (
                       <button
-                        key={pageNum}
+                        key={token}
                         type="button"
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`w-8 h-8 rounded-lg text-xs font-mono font-bold transition-all ${
+                        aria-label={String(token)}
+                        aria-current={isCurrent ? 'page' : undefined}
+                        onClick={() => handlePageChange(token)}
+                        className={`w-8 h-8 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center shrink-0 ${
                           isCurrent
-                            ? 'bg-[#E11D2F] text-white shadow-md'
-                            : 'bg-[#121212] border border-[#262626] text-[#A0A0A0] hover:text-white'
+                            ? 'bg-[#E11D2F] text-white shadow-md shadow-[#E11D2F]/25 border border-[#E11D2F] font-black'
+                            : 'bg-[#121212] border border-[#262626] text-[#A0A0A0] hover:text-white hover:bg-[#1f1f1f] hover:border-[#DCA54C]/50'
                         }`}
                       >
-                        {pageNum}
+                        {token}
                       </button>
                     );
                   })}
                 </div>
 
+                {/* Página Siguiente */}
                 <button
                   type="button"
+                  aria-label="Página siguiente"
                   disabled={safeCurrentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase bg-[#121212] border border-[#262626] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                  onClick={() => handlePageChange(safeCurrentPage + 1)}
+                  className="h-8 px-2.5 sm:px-3 rounded-lg text-xs font-mono font-bold uppercase bg-[#121212] border border-[#262626] text-[#A0A0A0] hover:text-white hover:bg-[#1f1f1f] hover:border-[#DCA54C]/50 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shrink-0"
                 >
-                  Siguiente <i className="fa-solid fa-chevron-right text-[10px]" aria-hidden="true" />
+                  <span className="hidden sm:inline">Siguiente</span>
+                  <i className="fa-solid fa-chevron-right text-[10px]" aria-hidden="true" />
                 </button>
-              </div>
+
+                {/* Ir a Última Página */}
+                <button
+                  type="button"
+                  aria-label="Última página"
+                  disabled={safeCurrentPage >= totalPages}
+                  onClick={() => handlePageChange(totalPages)}
+                  className="w-8 h-8 rounded-lg text-xs font-mono font-bold bg-[#121212] border border-[#262626] text-[#A0A0A0] hover:text-white hover:bg-[#1f1f1f] hover:border-[#DCA54C]/50 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center shrink-0"
+                >
+                  <i className="fa-solid fa-angles-right text-[10px]" aria-hidden="true" />
+                </button>
+              </nav>
             )}
           </div>
         </>
