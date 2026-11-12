@@ -207,8 +207,12 @@ export const carteleraService = {
    */
   async getDulceriaPublica(): Promise<ProductoDto[]> {
     try {
-      const data = await apiFetch<ProductoDto[]>('/taquilla/dulceria');
-      return Array.isArray(data) ? data : [];
+      const data = await apiFetch<ProductoDto[] | { value?: ProductoDto[] }>('/taquilla/dulceria');
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === 'object' && Array.isArray((data as { value?: ProductoDto[] }).value)) {
+        return (data as { value?: ProductoDto[] }).value || [];
+      }
+      return [];
     } catch {
       return [];
     }
