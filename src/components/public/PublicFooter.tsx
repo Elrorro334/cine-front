@@ -3,7 +3,7 @@ import Link from 'next/link';
 export default function PublicFooter() {
   return (
     <footer className="bg-[#111111] border-t border-[#262626] pt-14 pb-12 mt-16 relative z-20 overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-white via-[#E11D2F] to-white opacity-60"></div>
+      <div className="public-theme-footer-bar absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-white via-[#E11D2F] to-white opacity-60"></div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 md:gap-8 mb-12">
           {/* Columna 1: Identidad Cine Tradicional */}

@@ -1,0 +1,9 @@
+:root{--xilotzin-primary:#DC2626;--xilotzin-secondary:#16A34A;--xilotzin-bg:#07110C;--xilotzin-surface:#0F2117;--xilotzin-border:#166534;--xilotzin-text:#F8FAFC}
+.public-theme-root{background-color:#07110C!important;color:#F8FAFC!important}
+.public-theme-marquee{background:linear-gradient(90deg,#DC2626,#15803D,#CA8A04)!important;border-bottom-color:rgba(234,179,8,.55)!important}
+.public-theme-hero-glow{background:linear-gradient(90deg,rgba(220,38,38,.28),rgba(22,163,74,.2),rgba(234,179,8,.16))!important}
+.public-theme-divider{background:linear-gradient(90deg,#DC2626,#EAB308,#16A34A)!important;box-shadow:0 8px 22px rgba(220,38,38,.45)!important}
+.public-theme-card{background-color:#0F2117!important;border-color:#166534!important}
+.public-theme-card:hover{border-color:#EAB308!important;box-shadow:0 20px 40px rgba(22,163,74,.32)!important}
+.public-theme-pill-active{background-color:#DC2626!important;color:#ffffff!important;box-shadow:0 6px 18px rgba(220,38,38,.45)!important}
+.public-theme-footer-bar{background:linear-gradient(90deg,#16A34A,#EAB308,#DC2626)!important}
