@@ -379,7 +379,7 @@ function PreordenForm() {
   };
 
   return (
-    <div className={`min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-['Montserrat',sans-serif] flex flex-col antialiased selection:bg-[#E11D2F] selection:text-white relative ${isTicketModalOpen ? 'modal-ticket-active' : ''}`}>
+    <div className={`public-theme-root min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-['Montserrat',sans-serif] flex flex-col antialiased selection:bg-[#E11D2F] selection:text-white relative ${isTicketModalOpen ? 'modal-ticket-active' : ''}`}>
       <div className="no-print">
         <CinemaAmbientParticles />
       </div>

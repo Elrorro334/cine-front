@@ -4,6 +4,17 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/authService';
 
+function resolveLoginErrorTitle(message?: string): string {
+  const lower = message?.toLowerCase() || '';
+  if (lower.includes('horario laboral')) {
+    return 'Acceso Fuera de Horario Laboral';
+  }
+  if (lower.includes('red local') || lower.includes('restricción de red') || lower.includes('ip')) {
+    return 'Bloqueo por Restricción de Red (IP Externa)';
+  }
+  return 'Acceso Denegado';
+}
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -78,19 +89,19 @@ export default function LoginPage() {
         }, 600);
       } else {
         setLoginStatus('denied');
-        const isNetworkBlock = res.message?.toLowerCase().includes('red local') || res.message?.toLowerCase().includes('ip');
         setLoginError({
-          title: isNetworkBlock ? 'Bloqueo por Restricción de Red (IP Externa)' : 'Acceso Denegado',
+          title: resolveLoginErrorTitle(res.message),
           desc: res.message || 'El usuario o la contraseña ingresados no coinciden.',
         });
         triggerShake();
       }
     } catch (err: unknown) {
-      const error = err as { message?: string };
+      const error = err as { data?: { message?: string }; message?: string };
+      const serverMsg = error?.data?.message || error?.message;
       setLoginStatus('denied');
       setLoginError({
-        title: 'Error de Autenticación',
-        desc: error?.message || 'Error al conectar con el servidor de seguridad.',
+        title: serverMsg ? resolveLoginErrorTitle(serverMsg) : 'Error de Autenticación',
+        desc: serverMsg || 'Error al conectar con el servidor de seguridad.',
       });
       triggerShake();
     } finally {
@@ -113,6 +124,12 @@ export default function LoginPage() {
   const getButtonBg = () => {
     if (loginStatus === 'authorized') return 'bg-gradient-to-r from-green-600 to-emerald-500';
     return 'bg-gradient-to-r from-[#D81B60] to-[#F57C00] hover:from-pink-600 hover:to-orange-500';
+  };
+
+  const getButtonLabel = () => {
+    if (loginStatus === 'verifying') return 'VERIFICANDO...';
+    if (loginStatus === 'authorized') return 'AUTORIZADO - INGRESANDO...';
+    return 'Validar e Ingresar';
   };
 
   return (
@@ -178,13 +195,7 @@ export default function LoginPage() {
                 disabled={isLoggingIn || checkingNetwork}
                 className={`w-full text-white font-black py-4 rounded-xl uppercase flex justify-center items-center gap-2 ${getButtonBg()}`}
               >
-                {loginStatus === 'verifying' ? (
-                  <span>VERIFICANDO...</span>
-                ) : loginStatus === 'authorized' ? (
-                  <span>AUTORIZADO - INGRESANDO...</span>
-                ) : (
-                  <span>Validar e Ingresar</span>
-                )}
+                <span>{getButtonLabel()}</span>
               </button>
             </form>
           </div>
