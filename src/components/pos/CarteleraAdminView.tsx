@@ -63,6 +63,7 @@ export default function CarteleraAdminView({ onShowToast }: CarteleraAdminViewPr
 
   // Toast / Feedback local
   const [localToast, setLocalToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [peliculaAEliminar, setPeliculaAEliminar] = useState<{ id: number; titulo: string } | null>(null);
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => {
     if (onShowToast) {
@@ -232,14 +233,17 @@ export default function CarteleraAdminView({ onShowToast }: CarteleraAdminViewPr
     }
   };
 
-  const handleDeleteMovie = async (idPelicula: number, titulo: string) => {
-    const confirmar = window.confirm(
-      `¿Deseas dar de baja "${titulo}" de la cartelera oficial?\nEsta acción retirará la película y sus funciones programadas en SQL Server.`
-    );
-    if (!confirmar) return;
+  const handleDeleteMovie = (idPelicula: number, titulo: string) => {
+    setPeliculaAEliminar({ id: idPelicula, titulo });
+  };
+
+  const confirmDeleteMovie = async () => {
+    if (!peliculaAEliminar) return;
+    const { id, titulo } = peliculaAEliminar;
+    setPeliculaAEliminar(null);
 
     try {
-      await carteleraService.eliminarPelicula(idPelicula);
+      await carteleraService.eliminarPelicula(id);
       notify(`"${titulo}" ha sido retirada de cartelera exitosamente.`, 'success');
       await loadActiveMovies();
     } catch {
@@ -772,6 +776,41 @@ export default function CarteleraAdminView({ onShowToast }: CarteleraAdminViewPr
           ))}
         </div>
       </div>
+
+      {/* Modal de confirmación para dar de baja película (reemplazo de window.confirm) */}
+      {peliculaAEliminar && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#121212] border border-[#262626] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-xl bg-red-950/60 border border-red-500/40 text-[#E11D2F] flex items-center justify-center text-xl mx-auto">
+              <i className="fa-solid fa-trash-can" aria-hidden="true" />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-serif font-black uppercase text-white">
+                Dar de Baja Película
+              </h3>
+              <p className="text-xs text-[#a3a3a3] leading-relaxed">
+                ¿Estás seguro de que deseas retirar <strong className="text-white">&ldquo;{peliculaAEliminar.titulo}&rdquo;</strong> de la cartelera oficial? Esta acción retirará la película y sus funciones en SQL Server.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setPeliculaAEliminar(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-[#1e1e1e] border border-[#333333] text-xs font-bold uppercase text-white hover:bg-[#262626] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDeleteMovie()}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-[#E11D2F] hover:bg-red-700 text-xs font-black uppercase text-white shadow-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <i className="fa-solid fa-check" aria-hidden="true" /> Confirmar Baja
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

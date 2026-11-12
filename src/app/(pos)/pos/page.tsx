@@ -66,28 +66,6 @@ function extraerMensajeErrorServidor(err: unknown, fallback: string): string {
   return apiErr?.data?.error || apiErr?.data?.message || apiErr?.message || fallback;
 }
 
-function validarPreordenRecibida(pre: PreordenDto | null): string | null {
-  if (!pre) {
-    return 'Código QR no encontrado en base de datos.';
-  }
-  if (pre.expirada || (pre.diasTranscurridos !== undefined && pre.diasTranscurridos > 12)) {
-    return (
-      pre.motivoRechazo ||
-      `La pre-orden '${pre.codigo}' ha expirado (supera los 12 días de vigencia).`
-    );
-  }
-  if (pre.canjeada || !pre.estadoActivo) {
-    return (
-      pre.motivoRechazo ||
-      `La pre-orden '${pre.codigo}' ya fue canjeada o se encuentra cancelada / inactiva.`
-    );
-  }
-  if (pre.boletosGeneral <= 0) {
-    return 'La pre-orden no contiene boletos para canjear.';
-  }
-  return null;
-}
-
 interface PasoCobroSectionProps {
   totalGeneral: number;
   vistaCobro: VistaCobro;
@@ -703,12 +681,7 @@ export default function PosPage() {
   const handleQrSuccess = async (codigo: string) => {
     setMensajeFeedback(null);
     try {
-      const pre = await taquillaService.getPreorden(codigo);
-      const errorValidacion = validarPreordenRecibida(pre);
-      if (errorValidacion) {
-        setMensajeFeedback(errorValidacion);
-        return;
-      }
+      const pre = await taquillaService.validarPreordenQr(codigo);
 
       setIsQrModalOpen(false);
       setPendingPreorden(pre);

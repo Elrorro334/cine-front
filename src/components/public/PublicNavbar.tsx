@@ -133,10 +133,10 @@ export default function PublicNavbar() {
               Cartelera
             </Link>
             <Link
-              href="/#dulceria"
+              href="/dulceria"
               className="flex items-center gap-2 text-[#a3a3a3] hover:text-white transition-colors"
             >
-              <i className="fa-solid fa-store text-[#E11D2F]" aria-hidden="true" />
+              <i className="fa-solid fa-bag-shopping text-[#E11D2F]" aria-hidden="true" />
               Dulcería & Combos
             </Link>
             <Link
@@ -181,7 +181,7 @@ export default function PublicNavbar() {
             Cartelera
           </Link>
           <Link
-            href="/#dulceria"
+            href="/dulceria"
             onClick={() => setIsMobileMenuOpen(false)}
             className="block py-2 text-[#a3a3a3] hover:text-white"
           >

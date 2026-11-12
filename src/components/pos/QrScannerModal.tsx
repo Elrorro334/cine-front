@@ -113,8 +113,6 @@ export default function QrScannerModal({
     };
   }, [isOpen, startCamera, stopCamera]);
 
-  if (!isOpen) return null;
-
   const ejecutarValidacion = async (folioRaw: string) => {
     const trimmed = folioRaw.trim().toUpperCase();
     if (!trimmed) return;
@@ -132,6 +130,48 @@ export default function QrScannerModal({
       setLoading(false);
     }
   };
+
+  // Escaneo en vivo mientras la cámara esté activa (HU-08 / T1)
+  useEffect(() => {
+    if (!isOpen || !cameraActive || loading) return;
+
+    let scanTimer: NodeJS.Timeout | null = null;
+    let isProcessing = false;
+
+    const scanFrame = async () => {
+      if (isProcessing || !videoRef.current) return;
+      const video = videoRef.current;
+      if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+
+      const detector = getBarcodeDetector();
+      if (detector) {
+        isProcessing = true;
+        try {
+          const results = await detector.detect(video);
+          const detected = results[0]?.rawValue?.trim();
+          if (detected) {
+            setCodigo(detected.toUpperCase());
+            await ejecutarValidacion(detected);
+            return;
+          }
+        } catch {
+          // Ignorar frames intermedios sin código
+        } finally {
+          isProcessing = false;
+        }
+      }
+    };
+
+    scanTimer = setInterval(() => {
+      void scanFrame();
+    }, 250);
+
+    return () => {
+      if (scanTimer) clearInterval(scanTimer);
+    };
+  }, [isOpen, cameraActive, loading]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,7 +221,7 @@ export default function QrScannerModal({
           aria-label="Cerrar lector QR"
           className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-gray-300 transition hover:bg-white/15 hover:text-white"
         >
-          ✕
+          <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
         </button>
 
         {/* Encabezado Mockup 15 */}
