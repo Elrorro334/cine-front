@@ -10,6 +10,7 @@ import {
   PreordenDto,
   PeliculaTrailerDto,
   SolicitarCodigoPreordenResponseDto,
+  ProductoDto,
 } from '@/types/api';
 import { Movie, Promotion } from '@/types/cartelera';
 
@@ -198,6 +199,18 @@ export const carteleraService = {
       return await apiFetch<PeliculaTrailerDto>(`/cartelera/trailer/${idPelicula}`);
     } catch {
       return null;
+    }
+  },
+
+  /**
+   * Obtiene el catálogo público de dulcería y combos desde SQL Server vía API .NET
+   */
+  async getDulceriaPublica(): Promise<ProductoDto[]> {
+    try {
+      const data = await apiFetch<ProductoDto[]>('/taquilla/dulceria');
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
     }
   },
 };

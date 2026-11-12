@@ -1,10 +1,126 @@
-:root{--xilotzin-primary:#006847;--xilotzin-secondary:#CE1126;--xilotzin-bg:#090D0B;--xilotzin-surface:#111A15;--xilotzin-border:#1E3A2A;--xilotzin-text:#FFFFFF}
-.public-theme-root{background-color:#090D0B!important;color:#FFFFFF!important}
-.public-theme-marquee{background:linear-gradient(90deg,#006847 0%,#f8fafc 50%,#CE1126 100%)!important;color:#0A0A0A!important;border-bottom-color:rgba(0,104,71,.6)!important}
-.public-theme-marquee p{color:#0A0A0A!important;text-shadow:0 1px 0 rgba(255,255,255,.55)}
-.public-theme-hero-glow{background:linear-gradient(90deg,rgba(0,104,71,.34),rgba(255,255,255,.08),rgba(206,17,38,.3))!important}
-.public-theme-divider{background:linear-gradient(90deg,#006847,#FFFFFF,#CE1126)!important;box-shadow:0 8px 22px rgba(0,104,71,.5)!important}
-.public-theme-card{background-color:#111A15!important;border-color:#1E3A2A!important}
-.public-theme-card:hover{border-color:#006847!important;box-shadow:0 20px 40px rgba(0,104,71,.35)!important}
-.public-theme-pill-active{background-color:#006847!important;color:#FFFFFF!important;box-shadow:0 6px 18px rgba(0,104,71,.45)!important}
-.public-theme-footer-bar{background:linear-gradient(90deg,#006847,#FFFFFF,#CE1126)!important}
+@import url('https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Montserrat:wght@400;500;600;700;800;900&family=Rye&display=swap');
+
+:root {
+  --theme-primary: #00843D;
+  --theme-primary-hover: #006830;
+  --theme-bg: #07160E;
+  --theme-card: #0E291B;
+  --theme-border: #166534;
+  --theme-text: #FFFFFF;
+  --theme-muted: #86EFAC;
+  --theme-accent: #E4007C;
+  --theme-glow: rgba(0, 132, 61, 0.7);
+}
+
+body.theme-mexican, body.theme-patrias, [data-cine-theme="theme-mexican"], [data-cine-theme="theme-patrias"] {
+  background-color: #07160E !important;
+  color: #FFFFFF !important;
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(0, 132, 61, 0.5) 0%, transparent 45%),
+    radial-gradient(circle at 85% 20%, rgba(206, 17, 38, 0.4) 0%, transparent 45%),
+    radial-gradient(circle at 50% 85%, rgba(228, 0, 124, 0.25) 0%, transparent 50%),
+    radial-gradient(circle at 50% 15%, rgba(255, 215, 0, 0.15) 0%, transparent 40%),
+    linear-gradient(180deg, #051009 0%, #0F2D1C 100%) !important;
+}
+
+body.theme-mexican .font-serif,
+body.theme-mexican h1,
+body.theme-mexican h2,
+body.theme-mexican h3,
+body.theme-mexican .theme-heading,
+body.theme-patrias .font-serif,
+body.theme-patrias h1,
+body.theme-patrias h2,
+body.theme-patrias h3,
+body.theme-patrias .theme-heading {
+  font-family: 'Rye', 'Alfa Slab One', cursive !important;
+  letter-spacing: 0.04em !important;
+  text-shadow: 0 0 15px rgba(0, 132, 61, 0.8), 0 0 25px rgba(206, 17, 38, 0.7), 2px 2px 0px #000 !important;
+}
+
+body.theme-mexican header,
+body.theme-patrias header {
+  background-color: rgba(7, 22, 14, 0.97) !important;
+  border-bottom: 3px solid #00843D !important;
+  box-shadow: 0 10px 30px rgba(0, 132, 61, 0.4), 0 0 20px rgba(206, 17, 38, 0.3) !important;
+  position: relative;
+}
+
+body.theme-mexican .theme-marquee-bar,
+body.theme-mexican .public-theme-marquee,
+body.theme-patrias .theme-marquee-bar,
+body.theme-patrias .public-theme-marquee {
+  background: linear-gradient(90deg, #052312, #CE1126, #052312) !important;
+  color: #FFFFFF !important;
+  font-weight: 900 !important;
+  border-bottom: 2px solid #00843D !important;
+  text-shadow: 0 0 8px #000 !important;
+}
+
+body.theme-mexican .public-theme-card,
+body.theme-mexican .bg-\[\#121212\],
+body.theme-patrias .public-theme-card,
+body.theme-patrias .bg-\[\#121212\] {
+  background-color: #0E291B !important;
+  border-color: #166534 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), inset 0 0 15px rgba(0, 132, 61, 0.2) !important;
+}
+
+body.theme-mexican .public-theme-card:hover,
+body.theme-patrias .public-theme-card:hover {
+  border-color: #E4007C !important;
+  box-shadow: 0 20px 45px rgba(0, 132, 61, 0.45), 0 0 30px rgba(228, 0, 124, 0.4) !important;
+}
+
+body.theme-mexican .public-theme-divider,
+body.theme-patrias .public-theme-divider {
+  background: linear-gradient(135deg, #00843D, #CE1126) !important;
+  box-shadow: 0 8px 25px rgba(0, 132, 61, 0.6) !important;
+}
+
+body.theme-mexican .public-theme-pill-active,
+body.theme-patrias .public-theme-pill-active {
+  background: linear-gradient(135deg, #00843D, #CE1126) !important;
+  color: #FFFFFF !important;
+  font-weight: 900 !important;
+  box-shadow: 0 0 20px rgba(0, 132, 61, 0.6) !important;
+}
+
+body.theme-mexican .theme-card-badge,
+body.theme-patrias .theme-card-badge {
+  background: linear-gradient(135deg, #00843D 0%, #FFFFFF 50%, #CE1126 100%) !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+  box-shadow: 0 0 15px rgba(0, 132, 61, 0.8) !important;
+  border: 1px solid #FFD700 !important;
+}
+
+.mexican-papel-picado {
+  display: flex !important;
+  justify-content: space-around;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 14px;
+  z-index: 55;
+  pointer-events: none;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.banderin-picado {
+  width: 16px;
+  height: 14px;
+  display: inline-block;
+  clip-path: polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%);
+  animation: papelSway 2.5s ease-in-out infinite alternate;
+}
+.banderin-picado:nth-child(3n+1) { background: #00843D; box-shadow: 0 0 8px rgba(0, 132, 61, 0.85); animation-delay: 0s; }
+.banderin-picado:nth-child(3n+2) { background: #FFFFFF; box-shadow: 0 0 8px rgba(255, 255, 255, 0.85); animation-delay: 0.35s; }
+.banderin-picado:nth-child(3n+3) { background: #CE1126; box-shadow: 0 0 8px rgba(206, 17, 38, 0.85); animation-delay: 0.7s; }
+
+@keyframes papelSway {
+  0% { transform: rotate(-4deg) translateY(0); }
+  100% { transform: rotate(4deg) translateY(2px); }
+}

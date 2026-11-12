@@ -2,7 +2,21 @@
  * DTOs para la HU-11: Gestión de Inventario Maestro y Registro de Entradas
  */
 
-export type CategoriaInsumo = 'Snacks' | 'Bebidas' | 'Dulces' | 'Comida';
+export type CategoriaInsumo = 'Snacks' | 'Bebidas' | 'Dulces' | 'Comida' | 'Pizzas' | (string & {});
+
+export type EstadoStockFiltro = 'todos' | 'alerta' | 'agotado' | 'optimo';
+
+export type OrdenInventario =
+  | 'categoria_nombre'
+  | 'producto_asc'
+  | 'producto_desc'
+  | 'sku_asc'
+  | 'stock_asc'
+  | 'stock_desc'
+  | 'margen_asc'
+  | 'margen_desc'
+  | 'precio_asc'
+  | 'precio_desc';
 
 export interface InsumoInventarioDto {
   idProducto: number;
@@ -17,6 +31,17 @@ export interface InsumoInventarioDto {
   enAlerta: boolean;
   factorEquivalencia: number;
   icono: string;
+}
+
+export interface InventarioPaginadoDto {
+  items: InsumoInventarioDto[];
+  paginaActual: number;
+  tamanoPagina: number;
+  totalRegistros: number;
+  totalPaginas: number;
+  totalEnAlerta: number;
+  totalAgotados: number;
+  categoriasDisponibles: string[];
 }
 
 export interface EntradaHistorialLineaDto {
