@@ -40,6 +40,7 @@ export default function SeatMapModal({
   const [nombreSala, setNombreSala] = useState<string>('Sala 1');
   const [precioReal, setPrecioReal] = useState<number>(precioBoleto);
   const [loading, setLoading] = useState<boolean>(false);
+  const [avisoAsientos, setAvisoAsientos] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !idFuncion) return;
@@ -85,15 +86,17 @@ export default function SeatMapModal({
 
     if (selectedSeats.includes(asientoCodigo)) {
       setSelectedSeats(selectedSeats.filter((a) => a !== asientoCodigo));
+      setAvisoAsientos(null);
     } else {
       if (selectedSeats.length >= maxAllowed) {
         if (requiredSeats) {
-          alert(`Esta pre-orden requiere exactamente ${requiredSeats} butaca${requiredSeats > 1 ? 's' : ''}.`);
+          setAvisoAsientos(`Esta pre-orden requiere exactamente ${requiredSeats} butaca${requiredSeats > 1 ? 's' : ''}.`);
         } else {
-          alert('Máximo 8 boletos por selección.');
+          setAvisoAsientos('Máximo 8 boletos por selección.');
         }
         return;
       }
+      setAvisoAsientos(null);
       setSelectedSeats([...selectedSeats, asientoCodigo]);
     }
   };
@@ -101,9 +104,10 @@ export default function SeatMapModal({
   const autoAsignar = () => {
     const libres = butacas.filter((b) => !b.estaOcupada);
     if (libres.length < cantidadAuto) {
-      alert('No hay suficientes butacas libres disponibles.');
+      setAvisoAsientos('No hay suficientes butacas libres disponibles.');
       return;
     }
+    setAvisoAsientos(null);
     const sugeridas = libres.slice(0, cantidadAuto).map((b) => b.codigo);
     setSelectedSeats(sugeridas);
   };
@@ -143,6 +147,24 @@ export default function SeatMapModal({
         {requiredSeats && (
           <div className="mt-3 bg-pink-950/40 border border-[#D81B60]/40 rounded-xl px-3 py-2 text-center text-xs text-pink-200 font-mono">
             Canje de Pre-Orden: Selecciona exactamente <strong>{requiredSeats}</strong> butaca{requiredSeats > 1 ? 's' : ''} ({selectedSeats.length}/{requiredSeats})
+          </div>
+        )}
+
+        {/* Alerta inline de validación de butacas */}
+        {avisoAsientos && (
+          <div role="alert" className="mt-3 bg-amber-950/50 border border-amber-500/50 rounded-xl px-3 py-2 text-xs text-amber-200 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <i className="fa-solid fa-circle-exclamation text-amber-400" aria-hidden="true" />
+              <span>{avisoAsientos}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAvisoAsientos(null)}
+              aria-label="Cerrar aviso"
+              className="text-amber-400 hover:text-white"
+            >
+              <i className="fa-solid fa-xmark text-xs" aria-hidden="true" />
+            </button>
           </div>
         )}
 

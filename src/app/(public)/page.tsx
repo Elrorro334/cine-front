@@ -7,33 +7,83 @@ import MovieCard from '@/components/public/MovieCard';
 import MovieDetailModal from '@/components/public/MovieDetailModal';
 import PublicFooter from '@/components/public/PublicFooter';
 import CinemaAmbientParticles from '@/components/public/CinemaAmbientParticles';
+import DulceriaSection from '@/components/public/DulceriaSection';
 import { carteleraService } from '@/services/carteleraService';
 import { Movie, Promotion } from '@/types/cartelera';
+import { ProductoDto } from '@/types/api';
 
 const CLASSIFICATIONS = ['Todas', 'AA', 'A', 'B', 'B15', 'C'] as const;
+
+interface HeroThemeConfig {
+  badgeIcon: string;
+  badgeText: string;
+  titlePrefix: string;
+  titleHighlight: string;
+  desc: string;
+  overlayClass: string;
+}
+
+const HERO_THEMES: Record<string, HeroThemeConfig> = {
+  traditional: {
+    badgeIcon: 'fa-solid fa-star text-yellow-400',
+    badgeText: 'Pantalla Gigante • Sonido Digital • Jilotepec',
+    titlePrefix: 'La Magia del',
+    titleHighlight: 'Cine Tradicional',
+    desc: 'Consulta cartelera oficial en tiempo real, genera tu Pre-orden con código QR y canjéala directamente en caja sin hacer fila.',
+    overlayClass: 'bg-gradient-to-r from-[#E11D2F]/25 via-transparent to-white/10',
+  },
+  halloween: {
+    badgeIcon: 'fa-solid fa-ghost text-orange-400',
+    badgeText: 'TEMPORADA DE TERROR • NOCHE DE BRUJAS EN JILOTEPEC',
+    titlePrefix: 'Noches de Terror en',
+    titleHighlight: 'Cine Xilotzin',
+    desc: '¡Gritos, suspenso y las mejores películas de miedo en nuestra pantalla gigante! Aparta tus accesos en Pre-orden.',
+    overlayClass: 'bg-gradient-to-r from-orange-600/35 via-purple-900/40 to-black/80',
+  },
+  christmas: {
+    badgeIcon: 'fa-solid fa-star text-yellow-300',
+    badgeText: 'LA MAGIA DE LA NAVIDAD • CINE FAMILIAR',
+    titlePrefix: 'Celebra la Navidad en',
+    titleHighlight: 'Cine Xilotzin',
+    desc: 'Vive historias inolvidables, estrenos familiares y la magia de siempre en estas fiestas navideñas.',
+    overlayClass: 'bg-gradient-to-r from-emerald-600/35 via-red-900/40 to-black/80',
+  },
+  mexican: {
+    badgeIcon: 'fa-solid fa-flag text-emerald-400',
+    badgeText: '¡FIESTAS PATRIAS & TRADICIÓN MEXICANA! • CINE Y TRADICIÓN',
+    titlePrefix: '¡Viva el Cine! en',
+    titleHighlight: 'Cine Xilotzin',
+    desc: 'Grandes funciones patrias, cine nacional y lo mejor de la cartelera familiar con el sabor y orgullo de Jilotepec.',
+    overlayClass: 'bg-gradient-to-r from-emerald-700/35 via-red-800/35 to-black/85',
+  },
+};
 
 export default function PublicPage() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [dulceria, setDulceria] = useState<ProductoDto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedClassification, setSelectedClassification] = useState<string>('Todas');
 
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [activeTheme, setActiveTheme] = useState<string>('traditional');
 
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
       try {
         setLoading(true);
-        const [carteleraData, promoData] = await Promise.all([
+        const [carteleraData, promoData, dulceriaData] = await Promise.all([
           carteleraService.getCarteleraHoy(),
           carteleraService.getPromociones(),
+          carteleraService.getDulceriaPublica(),
         ]);
         if (isMounted) {
           setMovies(carteleraData);
           setPromotions(promoData);
+          setDulceria(dulceriaData);
         }
       } finally {
         if (isMounted) {
@@ -44,10 +94,30 @@ export default function PublicPage() {
 
     void loadData();
 
+    const updateTheme = () => {
+      if (typeof document === 'undefined') return;
+      const themeKey = document.documentElement.dataset.cineTheme || '';
+      if (themeKey.includes('halloween')) {
+        setActiveTheme('halloween');
+      } else if (themeKey.includes('christmas')) {
+        setActiveTheme('christmas');
+      } else if (themeKey.includes('mexican') || themeKey.includes('patrias')) {
+        setActiveTheme('mexican');
+      } else {
+        setActiveTheme('traditional');
+      }
+    };
+
+    updateTheme();
+    window.addEventListener('xilotzin_theme_change', updateTheme);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('xilotzin_theme_change', updateTheme);
     };
   }, []);
+
+  const heroConfig = HERO_THEMES[activeTheme] || HERO_THEMES.traditional;
 
   const handleOpenDetail = (movie: Movie) => {
     setSelectedMovie(movie);
@@ -135,33 +205,57 @@ export default function PublicPage() {
 
   return (
     <div className="public-theme-root min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-['Montserrat',sans-serif] flex flex-col antialiased selection:bg-[#E11D2F] selection:text-white relative">
-      {/* Fondo de Palomitas y Elementos de Cine en Movimiento */}
+      {/* Telarañas de esquina para Halloween */}
+      {activeTheme === 'halloween' && (
+        <>
+          <svg className="halloween-corner-web halloween-web-tl" id="web-tl" viewBox="0 0 100 100" fill="none" stroke="#FF5500" strokeWidth="1.5" aria-hidden="true">
+            <path d="M0,0 Q50,0 100,0 Q65,35 0,100 Z" opacity="0.2" fill="#FF5500"/>
+            <line x1="0" y1="0" x2="100" y2="0" />
+            <line x1="0" y1="0" x2="80" y2="25" />
+            <line x1="0" y1="0" x2="60" y2="50" />
+            <line x1="0" y1="0" x2="35" y2="80" />
+            <line x1="0" y1="0" x2="0" y2="100" />
+            <path d="M20,0 Q18,18 0,20 M40,0 Q36,36 0,40 M65,0 Q58,58 0,65 M90,0 Q80,80 0,90" />
+          </svg>
+          <svg className="halloween-corner-web halloween-web-tr" id="web-tr" viewBox="0 0 100 100" fill="none" stroke="#FF5500" strokeWidth="1.5" aria-hidden="true">
+            <path d="M0,0 Q50,0 100,0 Q65,35 0,100 Z" opacity="0.2" fill="#FF5500"/>
+            <line x1="0" y1="0" x2="100" y2="0" />
+            <line x1="0" y1="0" x2="80" y2="25" />
+            <line x1="0" y1="0" x2="60" y2="50" />
+            <line x1="0" y1="0" x2="35" y2="80" />
+            <line x1="0" y1="0" x2="0" y2="100" />
+            <path d="M20,0 Q18,18 0,20 M40,0 Q36,36 0,40 M65,0 Q58,58 0,65 M90,0 Q80,80 0,90" />
+          </svg>
+        </>
+      )}
+
+      {/* Fondo y Partículas Ambientales en Movimiento */}
       <CinemaAmbientParticles />
 
       {/* Barra de Navegación Superior */}
       <PublicNavbar />
 
-      {/* Hero Section con Fotografía Cinemática y Gradientes Atmosféricos (Exacto al Mockup) */}
-      <section className="relative w-full h-[38vh] sm:h-[44vh] md:h-[52vh] flex items-center justify-center overflow-hidden bg-[#0A0A0A] border-b border-[#262626]">
+      {/* Hero Section Dinámico Adaptado a la Temática */}
+      <section className="relative w-full h-[38vh] sm:h-[44vh] md:h-[52vh] flex items-center justify-center overflow-hidden bg-[#0A0A0A] border-b border-[#262626] transition-colors duration-500">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-45 bg-fixed"
           style={{ backgroundImage: `url('/CINE.png')` }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/60 to-transparent" />
-        <div className="public-theme-hero-glow absolute inset-0 bg-gradient-to-r from-[#E11D2F]/25 via-transparent to-white/10" />
+        <div className={`public-theme-hero-glow absolute inset-0 ${heroConfig.overlayClass} transition-all duration-500`} />
 
         <div className="relative z-10 text-center px-4 sm:px-6 max-w-4xl mx-auto flex flex-col items-center">
           <span className="bg-[#E11D2F]/30 border border-[#E11D2F]/50 text-white font-sans font-bold text-[9px] sm:text-[10px] md:text-xs uppercase tracking-[0.25em] sm:tracking-[0.3em] px-3 sm:px-4 py-1 sm:py-1.5 rounded-full mb-3 sm:mb-4 shadow-lg flex items-center gap-2">
-            <i className="fa-solid fa-star text-yellow-400 mr-1.5" /> Pantalla Gigante • Sonido Digital • Jilotepec
+            <i className={`${heroConfig.badgeIcon} mr-1.5`} aria-hidden="true" /> {heroConfig.badgeText}
           </span>
-          <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-['Playfair_Display',serif] font-black uppercase tracking-tight text-white mb-2 sm:mb-3 leading-tight md:leading-none drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-            La Magia del <br />
+          <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-serif font-black uppercase tracking-tight text-white mb-2 sm:mb-3 leading-tight md:leading-none drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+            {heroConfig.titlePrefix} <br />
             <span className="bg-gradient-to-r from-white to-[#E11D2F] bg-clip-text text-transparent">
-              Cine Tradicional
+              {heroConfig.titleHighlight}
             </span>
           </h1>
           <p className="text-white/90 text-[11px] sm:text-xs md:text-sm font-sans tracking-wider sm:tracking-widest uppercase max-w-xl mx-auto mt-1 sm:mt-2 font-bold leading-relaxed drop-shadow-[0_2px_5px_rgba(0,0,0,0.8)]">
-            Consulta cartelera oficial en tiempo real, genera tu Pre-orden con código QR y canjéala directamente en caja sin hacer fila.
+            {heroConfig.desc}
           </p>
         </div>
       </section>
@@ -170,7 +264,7 @@ export default function PublicPage() {
       <section className="max-w-7xl mx-auto px-4 md:px-6 pt-10 pb-4 w-full">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-sans font-bold uppercase tracking-[0.25em] text-[#A0A0A0] flex items-center gap-2">
-            <i className="fa-solid fa-bullhorn text-[#E11D2F] mr-2" /> Avisos & Novedades del Cine
+            <i className="fa-solid fa-bullhorn text-[#E11D2F] mr-2" aria-hidden="true" /> Avisos & Novedades del Cine
           </h2>
         </div>
         <PromotionsBanner promotions={promotions} />
@@ -179,7 +273,7 @@ export default function PublicPage() {
       {/* Main Content: Cartelera Inteligente (En Exhibición) */}
       <main className="flex-grow max-w-7xl mx-auto px-4 md:px-6 py-12 relative z-20 w-full space-y-10">
         <div className="flex flex-col items-center mb-10 relative text-center">
-          <h2 className="text-3xl md:text-4xl font-['Playfair_Display',serif] font-black uppercase tracking-widest text-white z-10 relative inline-block">
+          <h2 className="text-3xl md:text-4xl font-serif font-black uppercase tracking-widest text-white z-10 relative inline-block">
             En Exhibición
             <div className="public-theme-divider absolute -bottom-4 left-1/2 -translate-x-1/2 w-16 h-1 bg-[#E11D2F] rounded-full shadow-lg shadow-[#E11D2F]/50" />
           </h2>
@@ -223,8 +317,9 @@ export default function PublicPage() {
                 type="button"
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white text-xs"
+                aria-label="Limpiar búsqueda"
               >
-                <i className="fa-solid fa-xmark" />
+                <i className="fa-solid fa-xmark" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -232,6 +327,9 @@ export default function PublicPage() {
 
         {/* Render de la Cartelera (Grid o Estado Vacío) */}
         {renderCarteleraGrid()}
+
+        {/* Sección Pública de Dulcería & Combos (#dulceria) */}
+        <DulceriaSection products={dulceria} loading={loading} />
       </main>
 
       {/* Modal Ficha Técnica y Horarios */}

@@ -6,6 +6,7 @@ jest.mock('@/services/carteleraService', () => ({
   carteleraService: {
     getCarteleraHoy: jest.fn(),
     getPromociones: jest.fn(),
+    getDulceriaPublica: jest.fn(),
   },
 }));
 
@@ -39,14 +40,38 @@ describe('PublicPage Component', () => {
         icon: 'fa-ticket',
       },
     ]);
+    (carteleraService.getDulceriaPublica as jest.Mock).mockResolvedValue([
+      {
+        idProducto: 1,
+        sku: '7501001',
+        nombre: 'Palomitas Grandes',
+        categoria: 'Snacks',
+        precio: 50,
+        stock: 20,
+      },
+      {
+        idProducto: 2,
+        sku: '7501002',
+        nombre: 'Refresco 600ml',
+        categoria: 'Bebidas',
+        precio: 35,
+        stock: 0,
+      },
+    ]);
   });
 
-  test('renderiza la página pública con cartelera y promociones y permite filtrar', async () => {
+  test('renderiza la página pública con cartelera, promociones y dulcería y permite filtrar', async () => {
     render(<PublicPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Spider-Man')).toBeInTheDocument();
+      expect(screen.getByText('Palomitas Grandes')).toBeInTheDocument();
     });
+
+    // Verificar sección Dulcería & Combos (#dulceria) y filtro por categoría
+    fireEvent.click(screen.getByRole('button', { name: 'Bebidas' }));
+    expect(screen.getByText('Refresco 600ml')).toBeInTheDocument();
+    expect(screen.queryByText('Palomitas Grandes')).not.toBeInTheDocument();
 
     // Filtrar por texto que no coincide
     const searchInput = screen.getByPlaceholderText(/Buscar título o género/i);

@@ -1,9 +1,96 @@
-:root{--xilotzin-primary:#FF6D00;--xilotzin-secondary:#9333EA;--xilotzin-bg:#09050F;--xilotzin-surface:#160C24;--xilotzin-border:#4C1D95;--xilotzin-text:#FAF5FF}
-.public-theme-root{background-color:#09050F!important;color:#FAF5FF!important;font-family:'Cinzel','Montserrat',serif}
-.public-theme-marquee{background:linear-gradient(90deg,#FF6D00,#7C3AED,#FF6D00)!important;border-bottom-color:rgba(255,109,0,.6)!important}
-.public-theme-hero-glow{background:linear-gradient(90deg,rgba(255,109,0,.32),rgba(147,51,234,.22),rgba(255,109,0,.18))!important}
-.public-theme-divider{background:linear-gradient(90deg,#FF6D00,#9333EA)!important;box-shadow:0 8px 22px rgba(255,109,0,.55)!important}
-.public-theme-card{background-color:#160C24!important;border-color:#4C1D95!important}
-.public-theme-card:hover{border-color:#FF6D00!important;box-shadow:0 20px 42px rgba(255,109,0,.35)!important}
-.public-theme-pill-active{background-color:#FF6D00!important;color:#09050F!important;box-shadow:0 6px 18px rgba(255,109,0,.4)!important}
-.public-theme-footer-bar{background:linear-gradient(90deg,#9333EA,#FF6D00,#9333EA)!important}
+@import url('https://fonts.googleapis.com/css2?family=Creepster&family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  --theme-primary: #FF5500;
+  --theme-primary-hover: #CC4400;
+  --theme-bg: #0C0217;
+  --theme-card: #18072E;
+  --theme-border: #7E22CE;
+  --theme-text: #F3E8FF;
+  --theme-muted: #D8B4FE;
+  --theme-accent: #22C55E;
+  --theme-glow: rgba(255, 85, 0, 0.6);
+}
+
+body.theme-halloween, [data-cine-theme="theme-halloween"] {
+  background-color: #0C0217 !important;
+  color: #F3E8FF !important;
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(147, 51, 234, 0.5) 0%, transparent 45%),
+    radial-gradient(circle at 85% 20%, rgba(255, 85, 0, 0.35) 0%, transparent 45%),
+    radial-gradient(circle at 50% 85%, rgba(34, 197, 94, 0.2) 0%, transparent 50%),
+    linear-gradient(180deg, #090112 0%, #17042C 100%) !important;
+}
+
+body.theme-halloween .font-serif,
+body.theme-halloween h1,
+body.theme-halloween h2,
+body.theme-halloween h3,
+body.theme-halloween .theme-heading {
+  font-family: 'Creepster', cursive !important;
+  letter-spacing: 0.08em !important;
+  text-shadow: 0 0 10px #FF5500, 0 0 25px rgba(147, 51, 234, 0.9), 2px 2px 0px #000 !important;
+}
+
+body.theme-halloween header {
+  background-color: rgba(12, 2, 23, 0.97) !important;
+  border-bottom: 2px solid #FF5500 !important;
+  box-shadow: 0 10px 30px rgba(126, 34, 206, 0.5), 0 0 20px rgba(255, 85, 0, 0.3) !important;
+}
+
+body.theme-halloween .theme-marquee-bar,
+body.theme-halloween .public-theme-marquee {
+  background: linear-gradient(90deg, #1d032e, #FF5500, #140224) !important;
+  color: #FFFFFF !important;
+  border-bottom: 2px solid #FF5500 !important;
+  text-shadow: 0 0 8px #000 !important;
+}
+
+body.theme-halloween .public-theme-card,
+body.theme-halloween .bg-\[\#121212\] {
+  background-color: #18072E !important;
+  border-color: #7E22CE !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), inset 0 0 15px rgba(147, 51, 234, 0.2) !important;
+}
+
+body.theme-halloween .public-theme-card:hover {
+  border-color: #FF5500 !important;
+  box-shadow: 0 20px 45px rgba(255, 85, 0, 0.45), 0 0 30px rgba(147, 51, 234, 0.5) !important;
+}
+
+body.theme-halloween .public-theme-divider {
+  background-color: #FF5500 !important;
+  box-shadow: 0 8px 25px rgba(255, 85, 0, 0.6) !important;
+}
+
+body.theme-halloween .public-theme-pill-active {
+  background-color: #FF5500 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 15px rgba(255, 85, 0, 0.6) !important;
+}
+
+body.theme-halloween .theme-card-badge {
+  background: #FF5500 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 15px rgba(255, 85, 0, 0.8) !important;
+  border: 1px solid #FFAA00 !important;
+}
+
+.halloween-corner-web {
+  position: fixed;
+  width: 140px;
+  height: 140px;
+  pointer-events: none;
+  z-index: 35;
+  opacity: 0.45;
+}
+.halloween-web-tl { top: 0; left: 0; }
+.halloween-web-tr { top: 0; right: 0; transform: scaleX(-1); }
+
+@keyframes floatSpooky {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  50% { transform: translateY(-16px) rotate(6deg) scale(1.1); }
+}
+.spooky-float {
+  animation: floatSpooky 4s ease-in-out infinite;
+}

@@ -24,7 +24,7 @@ export default function PromotionsBanner({ promotions }: PromotionsBannerProps) 
   if (!currentPromo) return null;
 
   return (
-    <section id="promociones" className="w-full relative overflow-hidden rounded-3xl border border-[#262626] bg-[#111111] shadow-2xl">
+    <section id="promociones" className="scroll-mt-28 w-full relative overflow-hidden rounded-3xl border border-[#262626] bg-[#111111] shadow-2xl">
       {/* Background Gradient */}
       <div
         className={`absolute inset-0 bg-gradient-to-r ${currentPromo.gradient} opacity-90 transition-all duration-700`}

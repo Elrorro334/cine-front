@@ -72,7 +72,7 @@ export default function FinancialDashboardView() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch {
-      alert('Error al generar y descargar el reporte CSV.');
+      setErrorMessage('Error al generar y descargar el reporte CSV.');
     } finally {
       setIsExporting(false);
     }

@@ -287,4 +287,29 @@ describe('carteleraService', () => {
       expect.objectContaining({ method: 'POST' })
     );
   });
+
+  test('getDulceriaPublica retorna productos públicos desde /taquilla/dulceria', async () => {
+    const mockProductos = [
+      { idProducto: 1, sku: '7501001', nombre: 'Palomitas Grandes', categoria: 'Snacks', precio: 50, stock: 12 },
+    ];
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockProductos,
+    });
+
+    const res = await carteleraService.getDulceriaPublica();
+    expect(res).toHaveLength(1);
+    expect(res[0].nombre).toBe('Palomitas Grandes');
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/taquilla/dulceria'),
+      expect.any(Object)
+    );
+  });
+
+  test('getDulceriaPublica retorna arreglo vacío si falla la petición', async () => {
+    global.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error'));
+    const res = await carteleraService.getDulceriaPublica();
+    expect(res).toEqual([]);
+  });
 });

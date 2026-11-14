@@ -127,6 +127,42 @@ describe('inventarioService', () => {
     );
   });
 
+  test('getInsumosPaginado envía parámetros de paginación, búsqueda, estado y ordenamiento', async () => {
+    const mockPaginado = {
+      items: [],
+      paginaActual: 2,
+      tamanoPagina: 15,
+      totalRegistros: 30,
+      totalPaginas: 2,
+      totalEnAlerta: 3,
+      totalAgotados: 1,
+      categoriasDisponibles: ['Bebidas', 'Comida', 'Dulces', 'Pizzas', 'Snacks'],
+    };
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockPaginado,
+    });
+
+    const res = await inventarioService.getInsumosPaginado({
+      categoria: 'Pizzas',
+      busqueda: 'pepperoni',
+      estadoStock: 'alerta',
+      ordenarPor: 'stock_asc',
+      pagina: 2,
+      tamanoPagina: 15,
+    });
+
+    expect(res.paginaActual).toBe(2);
+    expect(res.tamanoPagina).toBe(15);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '/inventario/insumos/paginado?categoria=Pizzas&busqueda=pepperoni&estadoStock=alerta&ordenarPor=stock_asc&pagina=2&tamanoPagina=15'
+      ),
+      expect.any(Object)
+    );
+  });
+
   test('getProveedores consulta el catálogo de proveedores', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,

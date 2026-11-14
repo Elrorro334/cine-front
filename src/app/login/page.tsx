@@ -153,6 +153,20 @@ export default function LoginPage() {
               </span>
             </div>
 
+            {!checkingNetwork && !isAllowedIp && !loginError && (
+              <div role="alert" className="bg-red-950/40 border border-red-500/60 text-red-300 text-xs p-4 rounded-xl mb-6 flex gap-3">
+                <i className="fa-solid fa-triangle-exclamation text-red-400 text-lg shrink-0" aria-hidden="true" />
+                <div>
+                  <span className="font-bold text-white uppercase text-[11px] block">
+                    Bloqueo por restricción de red
+                  </span>
+                  <span className="text-[11px]">
+                    Tu IP actual ({detectedIp}) no está autorizada para personal de taquilla. Si eres Administrador, puedes ingresar con tus credenciales de gestión remota.
+                  </span>
+                </div>
+              </div>
+            )}
+
             {loginError && (
               <div className="bg-red-950/40 border border-red-500/60 text-red-300 text-xs p-4 rounded-xl mb-6 flex gap-3">
                 <i className="fa-solid fa-shield-virus text-red-400 text-lg shrink-0" />
