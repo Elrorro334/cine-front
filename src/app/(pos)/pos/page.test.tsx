@@ -445,7 +445,7 @@ describe('PosPage Component', () => {
   });
 
   test('HU-08: al canjear una pre-orden QR exige exactamente sus butacas, marca las líneas como PRE-ORDEN FIJA y permite agregar productos extra', async () => {
-    (taquillaService.getPreorden as jest.Mock).mockResolvedValue(
+    (taquillaService.validarPreordenQr as jest.Mock).mockResolvedValue(
       crearPreordenMock({
         combos: [{ nombre: 'Combo Pareja', cantidad: 1, precio: 110 }],
         total: 210,
@@ -467,7 +467,7 @@ describe('PosPage Component', () => {
     await escanearQr('pre-xil-001');
 
     await waitFor(() => {
-      expect(taquillaService.getPreorden).toHaveBeenCalledWith('PRE-XIL-001');
+      expect(taquillaService.validarPreordenQr).toHaveBeenCalledWith('PRE-XIL-001');
       expect(taquillaService.getButacasFuncion).toHaveBeenCalledWith(20);
     });
 
@@ -491,14 +491,8 @@ describe('PosPage Component', () => {
   });
 
   test('HU-08: rechaza una pre-orden que supera los 12 días de vigencia', async () => {
-    (taquillaService.getPreorden as jest.Mock).mockResolvedValue(
-      crearPreordenMock({
-        idPreorden: 8,
-        codigo: 'PRE-XIL-EXP15',
-        diasTranscurridos: 15,
-        expirada: true,
-        estadoActivo: true,
-      })
+    (taquillaService.validarPreordenQr as jest.Mock).mockRejectedValue(
+      new Error("La pre-orden 'PRE-XIL-EXP15' ha expirado (supera los 12 días de vigencia).")
     );
 
     render(<PosPage />);
@@ -511,12 +505,8 @@ describe('PosPage Component', () => {
   });
 
   test('rechaza una pre-orden inactiva o canjeada sin abrir el mapa de butacas', async () => {
-    (taquillaService.getPreorden as jest.Mock).mockResolvedValue(
-      crearPreordenMock({
-        idPreorden: 6,
-        codigo: 'PRE-XIL-002',
-        estadoActivo: false,
-      })
+    (taquillaService.validarPreordenQr as jest.Mock).mockRejectedValue(
+      new Error("La pre-orden 'PRE-XIL-002' ya fue canjeada o se encuentra cancelada / inactiva.")
     );
 
     render(<PosPage />);
@@ -529,13 +519,8 @@ describe('PosPage Component', () => {
   });
 
   test('rechaza una pre-orden sin boletos para canjear', async () => {
-    (taquillaService.getPreorden as jest.Mock).mockResolvedValue(
-      crearPreordenMock({
-        idPreorden: 7,
-        codigo: 'PRE-XIL-004',
-        boletosGeneral: 0,
-        total: 0,
-      })
+    (taquillaService.validarPreordenQr as jest.Mock).mockRejectedValue(
+      new Error('La pre-orden no contiene boletos para canjear.')
     );
 
     render(<PosPage />);
@@ -548,7 +533,9 @@ describe('PosPage Component', () => {
   });
 
   test('rechaza un código QR que no existe en la base de datos', async () => {
-    (taquillaService.getPreorden as jest.Mock).mockResolvedValue(null);
+    (taquillaService.validarPreordenQr as jest.Mock).mockRejectedValue(
+      new Error('Código QR no encontrado en base de datos.')
+    );
 
     render(<PosPage />);
     await escanearQr('PRE-INEXISTENTE');
@@ -560,7 +547,7 @@ describe('PosPage Component', () => {
   });
 
   test('muestra un mensaje cuando la pre-orden no se puede validar', async () => {
-    (taquillaService.getPreorden as jest.Mock).mockRejectedValue(
+    (taquillaService.validarPreordenQr as jest.Mock).mockRejectedValue(
       new Error('Error al validar la pre-orden desde SQL Server.')
     );
 

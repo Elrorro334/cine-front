@@ -10,6 +10,7 @@ import {
   PreordenDto,
   PeliculaTrailerDto,
   SolicitarCodigoPreordenResponseDto,
+  ProductoDto,
 } from '@/types/api';
 import { Movie, Promotion } from '@/types/cartelera';
 
@@ -42,8 +43,8 @@ function mapDtoToMovie(dto: PeliculaCarteleraDto): Movie {
     title: dto.titulo,
     tagline: 'En Exhibición Hoy',
     classification: dto.clasificacion || 'B',
-    duration: dto.duracion ? `${dto.duracion} min` : '115 min',
-    genre: 'Estreno',
+    duration: dto.duracion ? `${dto.duracion} min` : '120 min',
+    genre: dto.clasificacion ? `Clasif. ${dto.clasificacion}` : 'Cartelera',
     allGenres: 'Cine',
     rating: '8.5',
     posterUrl,
@@ -198,6 +199,22 @@ export const carteleraService = {
       return await apiFetch<PeliculaTrailerDto>(`/cartelera/trailer/${idPelicula}`);
     } catch {
       return null;
+    }
+  },
+
+  /**
+   * Obtiene el catálogo público de dulcería y combos desde SQL Server vía API .NET
+   */
+  async getDulceriaPublica(): Promise<ProductoDto[]> {
+    try {
+      const data = await apiFetch<ProductoDto[] | { value?: ProductoDto[] }>('/taquilla/dulceria');
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === 'object' && Array.isArray((data as { value?: ProductoDto[] }).value)) {
+        return (data as { value?: ProductoDto[] }).value || [];
+      }
+      return [];
+    } catch {
+      return [];
     }
   },
 };

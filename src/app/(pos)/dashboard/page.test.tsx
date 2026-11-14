@@ -209,6 +209,9 @@ describe('DashboardPage Component', () => {
     const deleteBtn = screen.getByRole('button', { name: /Dar de Baja/i });
     fireEvent.click(deleteBtn);
 
+    const confirmBtn = await screen.findByRole('button', { name: /Confirmar Baja/i });
+    fireEvent.click(confirmBtn);
+
     await waitFor(() => {
       expect(carteleraService.eliminarPelicula).toHaveBeenCalledWith(1);
     });

@@ -18,6 +18,48 @@ export function isValidStaticThemePath(href?: string | null): href is string {
   return trimmed.startsWith('/css/themes/') && trimmed.endsWith('.css');
 }
 
+export function applyThemeClassesToBody(claveIdentificadora?: string | null): void {
+  if (typeof document === 'undefined') return;
+
+  const validThemeClasses = [
+    'theme-traditional',
+    'theme-classic',
+    'theme-halloween',
+    'theme-christmas',
+    'theme-mexican',
+    'theme-patrias',
+    'theme-blockbuster',
+  ];
+
+  validThemeClasses.forEach((cls) => document.body.classList.remove(cls));
+
+  const clave = (claveIdentificadora || 'theme-traditional').toLowerCase();
+
+  if (clave.includes('halloween')) {
+    document.body.classList.add('theme-halloween');
+    document.documentElement.dataset.cineTheme = 'theme-halloween';
+    try { localStorage.setItem('xilotzin_tema_activo', 'halloween'); } catch {}
+  } else if (clave.includes('christmas') || clave.includes('navidad') || clave.includes('navideño')) {
+    document.body.classList.add('theme-christmas');
+    document.documentElement.dataset.cineTheme = 'theme-christmas';
+    try { localStorage.setItem('xilotzin_tema_activo', 'christmas'); } catch {}
+  } else if (clave.includes('mexican') || clave.includes('patria') || clave.includes('blockbuster')) {
+    document.body.classList.add('theme-mexican', 'theme-patrias');
+    document.documentElement.dataset.cineTheme = 'theme-mexican';
+    try { localStorage.setItem('xilotzin_tema_activo', 'mexican'); } catch {}
+  } else {
+    document.body.classList.add('theme-traditional', 'theme-classic');
+    document.documentElement.dataset.cineTheme = 'theme-traditional';
+    try { localStorage.setItem('xilotzin_tema_activo', 'traditional'); } catch {}
+  }
+
+  window.dispatchEvent(
+    new CustomEvent('xilotzin_theme_change', {
+      detail: document.documentElement.dataset.cineTheme,
+    })
+  );
+}
+
 export function applyThemeStylesheet(
   tematica: Pick<TematicaSitioDto, 'rutaArchivoCss' | 'claveIdentificadora'>
 ): void {
@@ -38,9 +80,7 @@ export function applyThemeStylesheet(
     linkEl.setAttribute('href', targetHref);
   }
 
-  if (tematica.claveIdentificadora) {
-    document.documentElement.dataset.cineTheme = tematica.claveIdentificadora;
-  }
+  applyThemeClassesToBody(tematica.claveIdentificadora);
 }
 
 export function broadcastThemeUpdate(tematica: TematicaSitioDto): void {
