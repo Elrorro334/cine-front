@@ -100,6 +100,40 @@ function writeSavedTickets(tickets: PreordenDto[]) {
   }
 }
 
+const CATEGORY_ICONS: Record<string, string> = {
+  palomitas: 'fa-solid fa-fire-burner',
+  bebidas: 'fa-solid fa-glass-water',
+  alimentos: 'fa-solid fa-utensils',
+  combos: 'fa-solid fa-layer-group',
+  dulces: 'fa-solid fa-candy-cane',
+  snacks: 'fa-solid fa-cookie-bite',
+  pizzas: 'fa-solid fa-pizza-slice',
+};
+
+function getCategoryIcon(cat: string): string {
+  const key = cat.toLowerCase();
+  for (const [prefix, icon] of Object.entries(CATEGORY_ICONS)) {
+    if (key.includes(prefix)) return icon;
+  }
+  return 'fa-solid fa-store';
+}
+
+function buildDulceriaPageTokens(currentPage: number, totalPages: number): (number | string)[] {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  if (currentPage <= 3) {
+    return [1, 2, 3, '...', totalPages];
+  }
+  if (currentPage >= totalPages - 2) {
+    return [1, '...', totalPages - 2, totalPages - 1, totalPages];
+  }
+  return [1, '...', currentPage, '...', totalPages];
+}
+
+const MAX_NOMBRE_LENGTH = 50;
+const DULCERIA_PAGE_SIZE = 6;
+
 function writeVerifiedPhone(phone: string | null) {
   try {
     if (phone) {
@@ -146,10 +180,16 @@ function PreordenForm() {
 
   // Datos del cliente
   const [nombreCliente, setNombreCliente] = useState('');
+  const [nombreError, setNombreError] = useState<string | null>(null);
   const [telefonoCliente, setTelefonoCliente] = useState('');
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Estados de dulcería estilo menú KFC / Cartelera
+  const [selectedDulceriaCategory, setSelectedDulceriaCategory] = useState<string>('Todas');
+  const [dulceriaSearchQuery, setDulceriaSearchQuery] = useState<string>('');
+  const [dulceriaPage, setDulceriaPage] = useState<number>(1);
 
   // Tickets guardados y teléfono verificado en este dispositivo (sincronizados sin efecto bloqueante)
   const savedTickets = useSyncExternalStore(
@@ -265,14 +305,92 @@ function PreordenForm() {
     setBoletos((prev) => Math.max(1, Math.min(10, prev + delta)));
   };
 
-  // Modificar combos
+  // Modificar combos (Conserva la selección entre páginas y categorías)
   const modificarCombo = (idProducto: number, delta: number) => {
     setCombosSeleccionados((prev) => {
       const actual = prev[idProducto] || 0;
       const nuevo = Math.max(0, actual + delta);
+      if (nuevo === 0) {
+        const next = { ...prev };
+        delete next[idProducto];
+        return next;
+      }
       return { ...prev, [idProducto]: nuevo };
     });
   };
+
+  // Manejador del nombre: Solo letras (incluyendo acentos, ñ, diéresis) y espacios, con límite
+  const handleNombreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const sanitized = raw.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
+    const cleaned = sanitized.replace(/\s{2,}/g, ' ');
+    const trimmedToMax = cleaned.slice(0, MAX_NOMBRE_LENGTH);
+
+    setNombreCliente(trimmedToMax);
+    if (trimmedToMax.trim().length > 0 && trimmedToMax.trim().length < 3) {
+      setNombreError('El nombre debe contener al menos 3 letras.');
+    } else {
+      setNombreError(null);
+    }
+  };
+
+  // Categorías únicas de dulcería con orden preferencial (Combos, Palomitas, Bebidas, etc.)
+  const dulceriaCategorias = useMemo(() => {
+    const unique = Array.from(
+      new Set(dulceriaProductos.map((p) => p.categoria).filter((c) => Boolean(c && c.trim())))
+    );
+    const priority = ['Palomitas', 'Combos', 'Bebidas', 'Alimentos', 'Dulces', 'Snacks', 'Pizzas'];
+    const sorted = unique.sort((a, b) => {
+      const idxA = priority.indexOf(a);
+      const idxB = priority.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+    return ['Todas', ...sorted];
+  }, [dulceriaProductos]);
+
+  // Filtrado de dulcería por categoría seleccionada y término de búsqueda
+  const filteredDulceriaProductos = useMemo(() => {
+    const q = dulceriaSearchQuery.trim().toLowerCase();
+    return dulceriaProductos.filter((prod) => {
+      const matchesCat =
+        selectedDulceriaCategory === 'Todas' ||
+        prod.categoria.toLowerCase() === selectedDulceriaCategory.toLowerCase();
+      const matchesQuery =
+        q === '' ||
+        prod.nombre.toLowerCase().includes(q) ||
+        prod.categoria.toLowerCase().includes(q) ||
+        prod.sku.toLowerCase().includes(q);
+      return matchesCat && matchesQuery;
+    });
+  }, [dulceriaProductos, selectedDulceriaCategory, dulceriaSearchQuery]);
+
+  const dulceriaTotalPages = Math.max(1, Math.ceil(filteredDulceriaProductos.length / DULCERIA_PAGE_SIZE));
+  const currentDulceriaPage = Math.min(dulceriaPage, dulceriaTotalPages);
+
+  const paginatedDulceriaProductos = useMemo(() => {
+    const start = (currentDulceriaPage - 1) * DULCERIA_PAGE_SIZE;
+    return filteredDulceriaProductos.slice(start, start + DULCERIA_PAGE_SIZE);
+  }, [filteredDulceriaProductos, currentDulceriaPage]);
+
+  // Conteo de artículos seleccionados por categoría (para badge en botón)
+  const getSelectedCountForCategory = (cat: string) => {
+    return Object.entries(combosSeleccionados).reduce((count, [idStr, cant]) => {
+      if (cant <= 0) return count;
+      const p = dulceriaProductos.find((prod) => prod.idProducto === Number(idStr));
+      if (!p) return count;
+      if (cat === 'Todas' || p.categoria.toLowerCase() === cat.toLowerCase()) {
+        return count + cant;
+      }
+      return count;
+    }, 0);
+  };
+
+  const totalArticulosDulceria = useMemo(() => {
+    return Object.values(combosSeleccionados).reduce((acc, curr) => acc + curr, 0);
+  }, [combosSeleccionados]);
 
   // Normalización y validación reactiva de teléfono de México (10 dígitos nacionales)
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -320,14 +438,23 @@ function PreordenForm() {
   const handleGenerarPreorden = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    setNombreError(null);
 
     if (!selectedFuncion) {
       setFormError('Debes seleccionar una película y horario de función.');
       return;
     }
 
-    if (!nombreCliente.trim() || nombreCliente.trim().length < 3) {
-      setFormError('Por favor ingresa tu nombre completo (mínimo 3 caracteres).');
+    const nombreTrimmed = nombreCliente.trim();
+    if (!nombreTrimmed || nombreTrimmed.length < 3) {
+      setNombreError('Por favor ingresa tu nombre completo (mínimo 3 letras).');
+      setFormError('Por favor verifica el nombre de quien recoge.');
+      return;
+    }
+
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]{3,50}$/.test(nombreTrimmed)) {
+      setNombreError('El nombre solo debe contener letras y espacios (máximo 50 caracteres).');
+      setFormError('Por favor verifica el nombre de quien recoge.');
       return;
     }
 
@@ -608,18 +735,23 @@ function PreordenForm() {
                   </div>
                 </div>
 
-                {/* Apartado 4: Combos y Snacks de Dulcería (Opcional) */}
-                <div className="bg-[#121212] border border-[#262626] rounded-2xl p-6 shadow-xl">
-                  <div className="flex items-center justify-between mb-4">
+                {/* Apartado 4: Combos y Snacks de Dulcería (Opcional - Estilo Menú KFC / Cartelera) */}
+                <div className="bg-[#121212] border border-[#262626] rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#262626] pb-3">
                     <div className="flex items-center gap-3">
-                      <span className="w-7 h-7 rounded-full bg-[#E11D2F] text-white font-bold text-xs flex items-center justify-center">
+                      <span className="w-7 h-7 rounded-full bg-[#E11D2F] text-white font-bold text-xs flex items-center justify-center shrink-0">
                         4
                       </span>
-                      <h2 className="text-lg font-['Playfair_Display',serif] font-black uppercase text-white">
-                        Agrega Dulcería a tu Pre-orden
-                      </h2>
+                      <div>
+                        <h2 className="text-base sm:text-lg font-['Playfair_Display',serif] font-black uppercase text-white">
+                          Agrega Dulcería a tu Pre-orden
+                        </h2>
+                        <p className="text-[11px] sm:text-xs text-[#A0A0A0] font-sans">
+                          Elige tus palomitas, bebidas y snacks por categoría (se liquidan en caja)
+                        </p>
+                      </div>
                     </div>
-                    <span className="text-[10px] bg-[#DCA54C]/20 text-[#DCA54C] border border-[#DCA54C]/40 px-2 py-0.5 rounded font-bold uppercase tracking-widest">
+                    <span className="text-[10px] bg-[#DCA54C]/20 text-[#DCA54C] border border-[#DCA54C]/40 px-2.5 py-1 rounded-full font-bold uppercase tracking-widest self-start sm:self-auto">
                       Opcional
                     </span>
                   </div>
@@ -634,67 +766,273 @@ function PreordenForm() {
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {dulceriaProductos.map((prod) => {
-                        const cant = combosSeleccionados[prod.idProducto] || 0;
-                        return (
-                          <div
-                            key={prod.idProducto}
-                            className="p-3.5 rounded-xl bg-[#0A0A0A] border border-[#262626] flex items-center justify-between gap-3"
-                          >
-                            <div className="flex items-center gap-3">
-                              {prod.img ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={prod.img}
-                                  alt={prod.nombre}
-                                  className="w-12 h-12 object-cover rounded-lg shrink-0 border border-[#262626]"
-                                />
-                              ) : (
-                                <div className="w-12 h-12 rounded-lg bg-neutral-900 border border-[#262626] flex items-center justify-center text-[#E11D2F]">
-                                  <i className="fa-solid fa-store" />
-                                </div>
-                              )}
-                              <div>
-                                <h3 className="text-xs font-bold text-white uppercase">{prod.nombre}</h3>
-                                <p className="text-[10px] text-[#A0A0A0]">{prod.categoria}</p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs font-mono font-bold text-[#DCA54C]">
-                                ${prod.precio} MXN
-                              </span>
-                              <div className="flex items-center gap-2 bg-[#121212] p-1 rounded-lg border border-[#262626]">
-                                <button
-                                  type="button"
-                                  onClick={() => modificarCombo(prod.idProducto, -1)}
-                                  className="w-6 h-6 rounded bg-[#0A0A0A] hover:bg-[#E11D2F] text-white flex items-center justify-center text-xs"
-                                  aria-label={`Quitar ${prod.nombre}`}
-                                >
-                                  <i className="fa-solid fa-minus" />
-                                </button>
-                                <span className="w-4 text-center font-mono text-xs font-bold">
-                                  {cant}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => modificarCombo(prod.idProducto, 1)}
-                                  className="w-6 h-6 rounded bg-[#0A0A0A] hover:bg-[#E11D2F] text-white flex items-center justify-center text-xs"
-                                  aria-label={`Agregar ${prod.nombre}`}
-                                >
-                                  <i className="fa-solid fa-plus" />
-                                </button>
-                              </div>
-                            </div>
+                    <>
+                      {/* Resumen de Artículos Seleccionados en Dulcería (Conserva la selección entre páginas y categorías) */}
+                      {totalArticulosDulceria > 0 && (
+                        <div className="bg-[#1a1112] border border-[#E11D2F]/40 rounded-xl p-3 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+                              <i className="fa-solid fa-basket-shopping text-[#E11D2F]" />
+                              Seleccionados: {totalArticulosDulceria} {totalArticulosDulceria === 1 ? 'producto' : 'productos'} (${subtotalCombos} MXN)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCombosSeleccionados({})}
+                              className="text-[10px] text-red-400 hover:text-red-300 underline font-semibold cursor-pointer"
+                            >
+                              Limpiar selección
+                            </button>
                           </div>
-                        );
-                      })}
-                    </div>
+
+                          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                            {Object.entries(combosSeleccionados)
+                              .filter(([, cant]) => cant > 0)
+                              .map(([idStr, cant]) => {
+                                const prod = dulceriaProductos.find((p) => p.idProducto === Number(idStr));
+                                if (!prod) return null;
+                                return (
+                                  <span
+                                    key={idStr}
+                                    className="inline-flex items-center gap-1.5 bg-[#0A0A0A] border border-[#333] px-2.5 py-1 rounded-lg text-[11px] font-sans text-neutral-200"
+                                  >
+                                    <span className="font-bold text-white truncate max-w-[140px]">{prod.nombre}</span>
+                                    <span className="font-mono text-[#DCA54C] font-bold">x{cant}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => modificarCombo(prod.idProducto, -1)}
+                                      className="w-4 h-4 rounded hover:bg-[#E11D2F] hover:text-white text-[#A0A0A0] flex items-center justify-center text-[10px] ml-0.5 cursor-pointer"
+                                      aria-label={`Restar ${prod.nombre}`}
+                                    >
+                                      <i className="fa-solid fa-minus text-[8px]" />
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Selector de Categorías Estilo Menú KFC / Rectángulos (Palomitas, Bebidas, etc.) */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-[#A0A0A0]">
+                            Categorías de Dulcería:
+                          </span>
+                          <span className="text-[10px] text-neutral-400">
+                            Pulsa un recuadro para filtrar
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {dulceriaCategorias.map((cat) => {
+                            const isSelected = selectedDulceriaCategory === cat;
+                            const selectedCount = getSelectedCountForCategory(cat);
+                            return (
+                              <button
+                                key={cat}
+                                type="button"
+                                aria-label={`Categoría ${cat}`}
+                                onClick={() => {
+                                  setSelectedDulceriaCategory(cat);
+                                  setDulceriaPage(1);
+                                }}
+                                className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-[#E11D2F] border-[#E11D2F] text-white shadow-lg shadow-[#E11D2F]/30 scale-[1.02]'
+                                    : 'bg-[#0A0A0A] border-[#262626] text-neutral-300 hover:border-[#E11D2F] hover:text-white'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <i className={`${getCategoryIcon(cat)} text-xs ${isSelected ? 'text-white' : 'text-[#E11D2F]'}`} />
+                                  <span className="text-xs font-bold uppercase truncate">{cat}</span>
+                                </div>
+                                {selectedCount > 0 && (
+                                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                                    isSelected ? 'bg-white text-black' : 'bg-[#E11D2F] text-white'
+                                  }`}>
+                                    {selectedCount}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Barra de búsqueda opcional dentro de dulcería */}
+                      <div className="relative">
+                        <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 text-xs" />
+                        <input
+                          type="text"
+                          value={dulceriaSearchQuery}
+                          onChange={(e) => {
+                            setDulceriaSearchQuery(e.target.value);
+                            setDulceriaPage(1);
+                          }}
+                          placeholder={`Buscar en ${selectedDulceriaCategory === 'Todas' ? 'toda la dulcería' : selectedDulceriaCategory}...`}
+                          className="w-full bg-[#0A0A0A] border border-[#262626] focus:border-[#E11D2F] rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none transition-colors"
+                        />
+                        {dulceriaSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDulceriaSearchQuery('');
+                              setDulceriaPage(1);
+                            }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white text-xs"
+                            aria-label="Limpiar búsqueda de dulcería"
+                          >
+                            <i className="fa-solid fa-xmark" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Desglose de Productos en Rectángulos / Tarjetas */}
+                      {filteredDulceriaProductos.length === 0 ? (
+                        <div className="py-6 text-center text-xs text-[#A0A0A0] bg-[#0A0A0A] rounded-xl border border-[#262626]">
+                          No se encontraron productos en &quot;{selectedDulceriaCategory}&quot;.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {paginatedDulceriaProductos.map((prod) => {
+                            const cant = combosSeleccionados[prod.idProducto] || 0;
+                            const isSelected = cant > 0;
+                            return (
+                              <div
+                                key={prod.idProducto}
+                                className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                                  isSelected
+                                    ? 'bg-[#181112] border-[#E11D2F] shadow-lg shadow-[#E11D2F]/20'
+                                    : 'bg-[#0A0A0A] border-[#262626] hover:border-[#404040]'
+                                }`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  {prod.img ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={prod.img}
+                                      alt={prod.nombre}
+                                      className="w-14 h-14 object-cover rounded-xl shrink-0 border border-[#262626]"
+                                    />
+                                  ) : (
+                                    <div className="w-14 h-14 rounded-xl bg-neutral-900 border border-[#262626] flex items-center justify-center text-[#E11D2F] shrink-0">
+                                      <i className={`${getCategoryIcon(prod.categoria)} text-xl`} />
+                                    </div>
+                                  )}
+
+                                  <div className="min-w-0 flex-1">
+                                    <span className="inline-block text-[9px] font-mono font-bold tracking-wider text-[#A0A0A0] uppercase bg-[#171717] px-2 py-0.5 rounded border border-[#262626] mb-1">
+                                      {prod.categoria}
+                                    </span>
+                                    <h3 className="text-xs font-bold text-white uppercase leading-snug line-clamp-2">
+                                      {prod.nombre}
+                                    </h3>
+                                    <span className="text-xs font-mono font-black text-[#DCA54C] block mt-1">
+                                      ${prod.precio} MXN
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-2 border-t border-[#262626]/60">
+                                  <span className="text-[10px] text-[#A0A0A0] font-sans">
+                                    {isSelected ? (
+                                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                        <i className="fa-solid fa-check" /> {cant} en pre-orden
+                                      </span>
+                                    ) : (
+                                      <span>Disponible</span>
+                                    )}
+                                  </span>
+
+                                  <div className="flex items-center gap-2 bg-[#121212] p-1 rounded-xl border border-[#262626]">
+                                    <button
+                                      type="button"
+                                      onClick={() => modificarCombo(prod.idProducto, -1)}
+                                      disabled={cant === 0}
+                                      className="w-7 h-7 rounded-lg bg-[#0A0A0A] hover:bg-[#E11D2F] disabled:opacity-30 disabled:hover:bg-[#0A0A0A] text-white flex items-center justify-center text-xs transition-colors cursor-pointer"
+                                      aria-label={`Quitar ${prod.nombre}`}
+                                    >
+                                      <i className="fa-solid fa-minus text-[10px]" />
+                                    </button>
+                                    <span className="w-6 text-center font-mono text-xs font-bold text-white">
+                                      {cant}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => modificarCombo(prod.idProducto, 1)}
+                                      className="w-7 h-7 rounded-lg bg-[#0A0A0A] hover:bg-[#E11D2F] text-white flex items-center justify-center text-xs transition-colors cursor-pointer"
+                                      aria-label={`Agregar ${prod.nombre}`}
+                                    >
+                                      <i className="fa-solid fa-plus text-[10px]" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Paginación de Dulcería (Mantiene la selección intacta al cambiar de página) */}
+                      {dulceriaTotalPages > 1 && (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-3 border-t border-[#262626] text-xs">
+                          <span className="text-[11px] text-[#A0A0A0] font-sans">
+                            Pág. {currentDulceriaPage} de {dulceriaTotalPages} ({filteredDulceriaProductos.length} {filteredDulceriaProductos.length === 1 ? 'producto' : 'productos'})
+                          </span>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setDulceriaPage((prev) => Math.max(1, prev - 1))}
+                              disabled={currentDulceriaPage <= 1}
+                              className="px-2.5 py-1.5 rounded-lg bg-[#0A0A0A] hover:bg-[#262626] disabled:opacity-30 text-white border border-[#262626] text-xs font-bold transition-colors cursor-pointer"
+                              aria-label="Página anterior de dulcería"
+                            >
+                              <i className="fa-solid fa-chevron-left text-[10px]" />
+                            </button>
+
+                            {buildDulceriaPageTokens(currentDulceriaPage, dulceriaTotalPages).map((token, idx) => {
+                              if (typeof token === 'string') {
+                                return (
+                                  <span key={`el-${idx}`} className="text-[#A0A0A0] px-1 text-xs">
+                                    ...
+                                  </span>
+                                );
+                              }
+                              const isActive = token === currentDulceriaPage;
+                              return (
+                                <button
+                                  key={token}
+                                  type="button"
+                                  onClick={() => setDulceriaPage(token)}
+                                  className={`w-7 h-7 rounded-lg text-xs font-bold font-mono transition-colors cursor-pointer ${
+                                    isActive
+                                      ? 'bg-[#E11D2F] text-white shadow'
+                                      : 'bg-[#0A0A0A] hover:bg-[#262626] text-neutral-300 border border-[#262626]'
+                                  }`}
+                                >
+                                  {token}
+                                </button>
+                              );
+                            })}
+
+                            <button
+                              type="button"
+                              onClick={() => setDulceriaPage((prev) => Math.min(dulceriaTotalPages, prev + 1))}
+                              disabled={currentDulceriaPage >= dulceriaTotalPages}
+                              className="px-2.5 py-1.5 rounded-lg bg-[#0A0A0A] hover:bg-[#262626] disabled:opacity-30 text-white border border-[#262626] text-xs font-bold transition-colors cursor-pointer"
+                              aria-label="Página siguiente de dulcería"
+                            >
+                              <i className="fa-solid fa-chevron-right text-[10px]" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
-                {/* Apartado 5: Datos de Quien Recoge (Validación de teléfono México 10 dígitos) */}
+                {/* Apartado 5: Datos de Quien Recoge (Validación de solo letras y límite en nombre) */}
                 <div className="bg-[#121212] border border-[#262626] rounded-2xl p-6 shadow-xl">
                   <div className="flex items-center gap-3 mb-4">
                     <span className="w-7 h-7 rounded-full bg-[#E11D2F] text-white font-bold text-xs flex items-center justify-center">
@@ -707,18 +1045,35 @@ function PreordenForm() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label htmlFor="input-cliente-nombre" className="block text-xs font-bold uppercase text-[#A0A0A0] mb-1.5">
-                        Nombre Completo *
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label htmlFor="input-cliente-nombre" className="block text-xs font-bold uppercase text-[#A0A0A0]">
+                          Nombre Completo *
+                        </label>
+                        <span className="text-[10px] text-[#A0A0A0] font-mono">
+                          {nombreCliente.length}/{MAX_NOMBRE_LENGTH}
+                        </span>
+                      </div>
                       <input
                         id="input-cliente-nombre"
                         type="text"
                         value={nombreCliente}
-                        onChange={(e) => setNombreCliente(e.target.value)}
+                        onChange={handleNombreChange}
                         placeholder="Ej. Carlos Méndez"
+                        maxLength={MAX_NOMBRE_LENGTH}
                         required
-                        className="w-full bg-[#0A0A0A] border border-[#262626] focus:border-[#E11D2F] rounded-xl px-4 py-3 text-xs text-white focus:outline-none transition-colors"
+                        className={`w-full bg-[#0A0A0A] border rounded-xl px-4 py-3 text-xs text-white focus:outline-none transition-colors max-w-full ${
+                          nombreError ? 'border-red-500' : 'border-[#262626] focus:border-[#E11D2F]'
+                        }`}
                       />
+                      {nombreError ? (
+                        <p className="text-[11px] text-red-400 mt-1 flex items-center gap-1">
+                          <i className="fa-solid fa-triangle-exclamation" /> {nombreError}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-[#A0A0A0] mt-1">
+                          Solo letras y espacios (sin números ni símbolos especiales).
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -800,6 +1155,18 @@ function PreordenForm() {
                           </span>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Datos de Entrega en Resumen (Truncado para evitar desbordamientos) */}
+                  {nombreCliente.trim() && (
+                    <div className="flex items-center justify-between gap-2 bg-[#0A0A0A] p-2.5 rounded-xl border border-[#262626] text-xs">
+                      <span className="text-[#A0A0A0] flex items-center gap-1.5 shrink-0">
+                        <i className="fa-solid fa-user text-[#E11D2F] text-[10px]" /> Recoge:
+                      </span>
+                      <span className="font-bold text-white truncate max-w-[200px]" title={nombreCliente.trim()}>
+                        {nombreCliente.trim()}
+                      </span>
                     </div>
                   )}
 
@@ -955,6 +1322,14 @@ function PreordenForm() {
 
             {/* Detalles de Vigencia y Folio */}
             <div className="bg-[#0A0A0A] border border-[#262626] rounded-xl p-3 mb-3 text-xs font-mono space-y-1 text-left ticket-info-box">
+              {activeTicket.cliente && (
+                <div className="flex justify-between items-center text-[#A0A0A0] print:text-neutral-800">
+                  <span>Titular:</span>
+                  <span className="text-white print:text-black font-bold truncate max-w-[180px]" title={activeTicket.cliente}>
+                    {activeTicket.cliente}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between items-center text-[#A0A0A0] print:text-neutral-800">
                 <span>Válido hasta:</span>
                 <span className="text-white print:text-black font-bold">

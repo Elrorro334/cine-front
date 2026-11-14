@@ -73,6 +73,22 @@ const mockDulceria: ProductoDto[] = [
     precio: 110,
     stock: 50,
   },
+  {
+    idProducto: 20,
+    sku: 'PAL001',
+    nombre: 'Palomitas Mantequilla Grandes',
+    categoria: 'Palomitas',
+    precio: 65,
+    stock: 100,
+  },
+  {
+    idProducto: 30,
+    sku: 'BEB001',
+    nombre: 'Refresco Cola 1L',
+    categoria: 'Bebidas',
+    precio: 45,
+    stock: 80,
+  },
 ];
 
 describe('PreordenPage Component', () => {
@@ -293,5 +309,68 @@ describe('PreordenPage Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /Consultar otro número/i }));
     expect(await screen.findByLabelText(/Teléfono registrado/i)).toBeInTheDocument();
     expect(localStorage.getItem('xilotzin_verified_phone')).toBeNull();
+  });
+
+  test('filtra dulcería por categorías tipo KFC y conserva selecciones entre cambios de categoría', async () => {
+    render(<PreordenPage />);
+
+    await screen.findAllByText('La posesión de la momia');
+    expect(await screen.findByText('Combo Pareja Xilotzin')).toBeInTheDocument();
+    expect(screen.getByText('Palomitas Mantequilla Grandes')).toBeInTheDocument();
+
+    // 1. Agregar un combo
+    const agregarComboBtn = screen.getByRole('button', { name: /Agregar Combo Pareja Xilotzin/i });
+    fireEvent.click(agregarComboBtn);
+
+    // 2. Filtrar por categoría "Palomitas"
+    const palomitasBtn = screen.getByRole('button', { name: /Categoría Palomitas/i });
+    fireEvent.click(palomitasBtn);
+
+    // Se muestra Palomitas pero NO Combos en el listado de productos
+    expect(screen.getByText('Palomitas Mantequilla Grandes')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Agregar Combo Pareja Xilotzin/i })).toBeNull();
+
+    // 3. Agregar palomitas
+    const agregarPalomitasBtn = screen.getByRole('button', { name: /Agregar Palomitas Mantequilla Grandes/i });
+    fireEvent.click(agregarPalomitasBtn);
+
+    // 4. Cambiar a categoría "Bebidas"
+    const bebidasBtn = screen.getByRole('button', { name: /Categoría Bebidas/i });
+    fireEvent.click(bebidasBtn);
+
+    // En el catálogo visible de productos solo aparece Bebidas
+    expect(screen.getByText('Refresco Cola 1L')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Agregar Palomitas Mantequilla Grandes/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Agregar Combo Pareja Xilotzin/i })).toBeNull();
+
+    // 5. Verificar que el total y la barra de seleccionados conservan ambos productos
+    expect(screen.getByText('$225 MXN')).toBeInTheDocument();
+    expect(screen.getByText(/Seleccionados: 2 productos/i)).toBeInTheDocument();
+  });
+
+  test('valida y sanitiza el campo de Nombre Completo (solo letras, sin números ni símbolos, límite de caracteres)', async () => {
+    render(<PreordenPage />);
+
+    await screen.findAllByText('La posesión de la momia');
+
+    const nombreInput = screen.getByLabelText(/Nombre Completo \*/i) as HTMLInputElement;
+
+    // Intentar escribir números y símbolos extraños: deben ser filtrados automáticamente
+    fireEvent.change(nombreInput, { target: { value: 'Juan 123 @# Carlos' } });
+    expect(nombreInput.value).toBe('Juan Carlos');
+
+    // Intentar exceder el límite de 50 caracteres
+    const longName = 'A'.repeat(60);
+    fireEvent.change(nombreInput, { target: { value: longName } });
+    expect(nombreInput.value.length).toBe(50);
+
+    // Mensaje de advertencia si tiene menos de 3 letras
+    fireEvent.change(nombreInput, { target: { value: 'Lu' } });
+    expect(screen.getByText(/El nombre debe contener al menos 3 letras/i)).toBeInTheDocument();
+
+    // Nombre válido con tildes y ñ
+    fireEvent.change(nombreInput, { target: { value: 'María José Peña' } });
+    expect(nombreInput.value).toBe('María José Peña');
+    expect(screen.queryByText(/El nombre debe contener al menos 3 letras/i)).toBeNull();
   });
 });
